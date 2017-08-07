@@ -5,6 +5,7 @@ import os
 import cv2
 
 lib = CDLL('/root/workspace/PedestrainDetection/darknet/libdarknet.so', RTLD_GLOBAL)
+# lib = CDLL('/home/maths/btech/mt1140594/workspace/PedestrainDetection/darknet/libdarknet.so', RTLD_GLOBAL)
 
 load_net = lib.load_detector
 load_net.argtypes = [c_char_p, c_char_p, c_char_p]
@@ -26,6 +27,7 @@ net_dim = 608
 
 def prepare_data(data_dirs = ['Human2','Human3','Human4','Human5','Human5','Human7','Human8','Human9','Woman','Jogging-1', 'Jogging-2','Walking','Walking2']):
     path_prefix = '/root/Artifacia-Data/TB-50/'
+    # path_prefix = '/scratch/maths/btech/mt1140594/Data/TB-50/'
     frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs = [], [], []
     print "All Directories List:", data_dirs
 
@@ -66,7 +68,7 @@ def prepare_data(data_dirs = ['Human2','Human3','Human4','Human5','Human5','Huma
 def extract_spatio_info(frame_path):
     obj_detections, vis_feat = [], None
     out = detect_obj(net, frame_path, 0.24, 0.5, "prediction")
-    vis_feat = extract_feat(30, net)
+    vis_feat = extract_feat(25, net)
     for detection in out:
         if detection.get('class')=='car' or detection.get('class')=='person':
             obj_detections.append(detection)
@@ -86,24 +88,40 @@ def process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs =
     for i, (frame_paths, frame_bboxs, frame_dim) in enumerate(zip(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs)):
         frame_height, frame_width = frame_dim[0], frame_dim[1]
 
-        vis_feat = np.zeros((len(frame_paths), 1024))
-        heatmap_feat = np.zeros((len(frame_paths), 1024))
+        # vis_feat = np.zeros((len(frame_paths), 1024))
+        # heatmap_feat = np.zeros((len(frame_paths), 1024))
 
-        print "Extracting features for Data in Directory:", data_dirs[i].split('-')[0]
-        for j, (frame_path, frame_bbox) in enumerate(zip(frame_paths,frame_bboxs)):
-            _, feat = extract_spatio_info(frame_path)
+        vis_data_file = '../data/vis_feats_' + data_dirs[i]
+        heatmap_data_file = '../data/heatmap_feats_' + data_dirs[i]
 
-            tmp = np.array(feat, dtype='float32')
-            tmp = tmp.reshape((19,19,1024))
-            feat = np.amax(tmp, axis=(0,1))
+        # if os.path.isfile(vis_data_file): #skipping if file already exists
+        #     continue
+        if i<0: #resuming from given index
+            continue
 
-            det_x = float(frame_bbox[0])/frame_width
-            det_y = float(frame_bbox[1])/frame_height
-            det_h = float(frame_bbox[3])/frame_height
-            det_w = float(frame_bbox[2])/frame_width
+        with open(vis_data_file, 'ab', 0) as f_vis, open(heatmap_data_file, 'ab', 0) as f_heat:
 
-            heat_map_feat = generate_heatmap_feat(det_x, det_y, det_h, det_w)
-            heatmap_feat[j,:] = heat_map_feat
-            vis_feat[j, :] = feat
+            print "Extracting features for Data in Directory:", data_dirs[i].split('-')[0]
+            for j, (frame_path, frame_bbox) in enumerate(zip(frame_paths,frame_bboxs)):
+                if (j+1)<0: #Resuming from given index
+                    continue
 
-        np.savez(data_dirs[i], vis_feat=vis_feat, heatmap_feat=heatmap_feat)
+                _, feat = extract_spatio_info(frame_path)
+
+                tmp = np.array(feat, dtype='float32').reshape((19,19,1024))
+                feat = np.amax(tmp, axis=(0,1))
+                print feat[0:10]
+
+                det_x = float(frame_bbox[0])/frame_width
+                det_y = float(frame_bbox[1])/frame_height
+                det_h = float(frame_bbox[3])/frame_height
+                det_w = float(frame_bbox[2])/frame_width
+
+                heat_map_feat = generate_heatmap_feat(det_x, det_y, det_h, det_w)
+                # heatmap_feat[j,:] = heat_map_feat
+                # vis_feat[j, :] = feat
+                np.savetxt(f_vis, (feat.reshape((1,-1))), delimiter=',')
+                np.savetxt(f_heat, (heat_map_feat.reshape((1,-1))), delimiter=',')
+
+        break
+        # np.savez(data_dirs[i], vis_feat=vis_feat, heatmap_feat=heatmap_feat)
