@@ -4,7 +4,7 @@
 ._*
 *.csv
 *.h5
-
+data/*
 
 # Prerequisites
 *.d

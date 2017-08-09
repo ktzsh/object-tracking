@@ -1,31 +1,107 @@
-import numpy as np
 from ctypes import *
+import numpy as np
+import math
+import random
+import time
 import sys
 import os
 import cv2
 
-lib = CDLL('/root/workspace/PedestrainDetection/darknet/libdarknet.so', RTLD_GLOBAL)
+class BOX(Structure):
+    _fields_ = [("x", c_float),
+                ("y", c_float),
+                ("w", c_float),
+                ("h", c_float)]
 
-load_net = lib.load_detector
-load_net.argtypes = [c_char_p, c_char_p, c_char_p]
-load_net.restype = c_void_p
+class IMAGE(Structure):
+    _fields_ = [("w", c_int),
+                ("h", c_int),
+                ("c", c_int),
+                ("data", POINTER(c_float))]
 
-detect_obj = lib.pyrun_detector
-detect_obj.argtypes = [c_void_p, c_char_p, c_float, c_float, c_char_p]
-detect_obj.restype = py_object
+class METADATA(Structure):
+    _fields_ = [("classes", c_int),
+                ("names", POINTER(c_char_p))]
 
-extract_feat = lib.pyfeat_extract
-extract_feat.argtypes = [c_int, c_void_p]
-extract_feat.restype = py_object
+class FEATURE(Structure):
+    _fields_ = [("size", c_int),
+                ("feat", POINTER(c_float))]
 
 os.chdir('./darknet')
+lib = CDLL("libdarknet.so", RTLD_GLOBAL)
+
+make_boxes = lib.make_boxes
+make_boxes.argtypes = [c_void_p]
+make_boxes.restype = POINTER(BOX)
+
+free_ptrs = lib.free_ptrs
+free_ptrs.argtypes = [POINTER(c_void_p), c_int]
+
+num_boxes = lib.num_boxes
+num_boxes.argtypes = [c_void_p]
+num_boxes.restype = c_int
+
+make_probs = lib.make_probs
+make_probs.argtypes = [c_void_p]
+make_probs.restype = POINTER(POINTER(c_float))
+
+load_net = lib.load_network_p
+load_net.argtypes = [c_char_p, c_char_p, c_int]
+load_net.restype = c_void_p
+
+free_image = lib.free_image
+free_image.argtypes = [IMAGE]
+
+load_meta = lib.get_metadata
+lib.get_metadata.argtypes = [c_char_p]
+lib.get_metadata.restype = METADATA
+
+load_image = lib.load_image_color
+load_image.argtypes = [c_char_p, c_int, c_int]
+load_image.restype = IMAGE
+
+network_detect = lib.network_detect
+network_detect.argtypes = [c_void_p, IMAGE, c_float, c_float, c_float, POINTER(BOX), POINTER(POINTER(c_float))]
+
+extract_feat = lib.network_extract_feat
+extract_feat.argtypes = [c_void_p, c_int]
+extract_feat.restype = FEATURE
+
 global net
-net = load_net("cfg/coco.data", "cfg/yolo.cfg", "yolo.weights")
+global meta
 global net_dim
+
 net_dim = 608
+net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
+meta = load_meta("cfg/coco.data")
+os.chdir('../')
+
+def detect(net, meta, image, thresh=.5, hier_thresh=.5, nms=.45):
+    im = load_image(image, 0, 0)
+    boxes = make_boxes(net)
+    probs = make_probs(net)
+    num =   num_boxes(net)
+    network_detect(net, im, thresh, hier_thresh, nms, boxes, probs)
+    res = []
+    for j in range(num):
+        for i in range(meta.classes):
+            if probs[j][i] > 0:
+                res.append((meta.names[i], probs[j][i], (boxes[j].x, boxes[j].y, boxes[j].w, boxes[j].h)))
+    res = sorted(res, key=lambda x: -x[1])
+    free_image(im)
+    free_ptrs(cast(probs, POINTER(c_void_p)), num)
+    return res
+
+def extract(net, n):
+    f = extract_feat(net, n)
+    feat = np.zeros((f.size))
+    for j in range(f.size):
+        feat[j] = f.feat[j]
+    feat = feat.reshape((19,19,1024))
+    return feat
 
 def prepare_data(data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1', 'Jogging-2','Walking','Walking2']):
-    path_prefix = '/root/Artifacia-Data/TB-50/'
+    path_prefix = './data/TB-50/'
     frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs = [], [], []
     print "All Directories List:", data_dirs
 
@@ -64,11 +140,12 @@ def prepare_data(data_dirs = ['Human2','Human3','Human4','Human5','Human6','Huma
     return frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs
 
 def extract_spatio_info(frame_path):
-    obj_detections, vis_feat = [], None
-    out = detect_obj(net, frame_path, 0.24, 0.5, "prediction")
-    vis_feat = extract_feat(30, net)
+    obj_detections = []
+    out = detect(net, meta, frame_path)
+    vis_feat = extract(net, 24)
+
     for detection in out:
-        if detection.get('class')=='car' or detection.get('class')=='person':
+        if detection[0]=='car' or detection[0]=='truck' or detection[0]=='person':
             obj_detections.append(detection)
     return obj_detections, vis_feat
 
@@ -86,40 +163,43 @@ def process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs =
     for i, (frame_paths, frame_bboxs, frame_dim) in enumerate(zip(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs)):
         frame_height, frame_width = frame_dim[0], frame_dim[1]
 
-        vis_data_file = '../data/vis_feats_' + data_dirs[i]
-        heatmap_data_file = '../data/heatmap_feats_' + data_dirs[i]
+        vis_data_file = './data/vis_feats_' + data_dirs[i]
+        heatmap_data_file = './data/heatmap_feats_' + data_dirs[i]
 
         # if i<0:
         #     continue
+        with open(vis_data_file, 'wb', 0) as f_vis, open(heatmap_data_file, 'wb', 0) as f_heat:
+            print "Extracting features for Data in Directory:", data_dirs[i].split('-')[0]
+            print "Begin.."
+            start = time.time()
+            for j, (frame_path, frame_bbox) in enumerate(zip(frame_paths,frame_bboxs)):
 
-        print "Extracting features for Data in Directory:", data_dirs[i].split('-')[0]
-        for j, (frame_path, frame_bbox) in enumerate(zip(frame_paths,frame_bboxs)):
+                # if j<0:
+                #     continue
+                if j%100==0 and j!=0:
+                    end = time.time()
+                    print "Frames Processed:", j, "| Time Taken:", (end-start)
+                    start = end
 
-            # if j<0:
-            #     continue
+                _, feat = extract_spatio_info(frame_path)
+                feat_norm = np.amax(feat, axis=(0,1))
 
-            _, feat = extract_spatio_info(frame_path)
+                det_x = float(frame_bbox[0])/frame_width
+                det_y = float(frame_bbox[1])/frame_height
+                det_h = float(frame_bbox[3])/frame_height
+                det_w = float(frame_bbox[2])/frame_width
 
-            tmp = np.array(feat, dtype='float32')
-            tmp = tmp.reshape((19,19,1024))
-            feat = np.amax(tmp, axis=(0,1))
-
-            det_x = float(frame_bbox[0])/frame_width
-            det_y = float(frame_bbox[1])/frame_height
-            det_h = float(frame_bbox[3])/frame_height
-            det_w = float(frame_bbox[2])/frame_width
-
-            heatmap_feat = generate_heatmap_feat(det_x, det_y, det_h, det_w)
-            np.savetxt(f_vis, (feat.reshape((1,-1))), delimiter=',')
-            np.savetxt(f_heat, (heatmap_feat.reshape((1,-1))), delimiter=',')
+                heatmap_feat = generate_heatmap_feat(det_x, det_y, det_h, det_w)
+                np.savetxt(f_vis, (feat_norm.reshape((1,-1))), delimiter=',')
+                np.savetxt(f_heat, (heatmap_feat.reshape((1,-1))), delimiter=',')
 
 
 def read_data(sequence_length=6, vis_feat_size=1024, heatmap_feat_size=1024, data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1','Jogging-2','Walking','Walking2']):
     for data_dir in data_dirs:
 
         print "Reading Directory:", data_dir
-        vis_data_file = '../data/vis_feats_' + data_dir
-        heatmap_data_file = '../data/heatmap_feats_' + data_dir
+        vis_data_file = './data/vis_feats_' + data_dir
+        heatmap_data_file = './data/heatmap_feats_' + data_dir
 
         vis_feat = np.genfromtxt(vis_data_file, dtype='float32', delimiter=',')
         heatmap_feat = np.genfromtxt(heatmap_data_file, dtype='float32', delimiter=',')
