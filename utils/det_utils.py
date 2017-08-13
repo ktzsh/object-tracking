@@ -28,7 +28,7 @@ class FEATURE(Structure):
                 ("feat", POINTER(c_float))]
 
 os.chdir('./darknet')
-lib = CDLL("libdarknet.so", RTLD_GLOBAL)
+lib = CDLL("/home/maths/btech/mt1140589/workspace/object-tracking/darknet/libdarknet.so", RTLD_GLOBAL)
 
 make_boxes = lib.make_boxes
 make_boxes.argtypes = [c_void_p]
@@ -213,7 +213,7 @@ def read_data(sequence_length=6, vis_feat_size=1024, heatmap_feat_size=1024, dat
             x_sample = np.zeros((sequence_length, (vis_feat_size + heatmap_feat_size)))
             y_sample = np.zeros((sequence_length, heatmap_feat_size))
             for j in range(sequence_length):
-                x_sample[j, :] = np.append(vis_feat_size[i+j], heatmap_feat[i+j])
+                x_sample[j, :] = np.append(vis_feat[i+j], heatmap_feat[i+j])
                 y_sample[j, :] = heatmap_feat[i+j+1]
 
             x[i] = x_sample
@@ -249,3 +249,51 @@ def get_trainval_data(data_dirs = ['Human2','Human3','Human4','Human5','Human6',
 
     print "Shapes of Train/Val X/Y Data:", x_train.shape, y_train.shape, x_val.shape, y_val.shape
     return x_train, y_train, x_val, y_val
+
+def read_test_data(sequence_length=6, vis_feat_size=1024, heatmap_feat_size=1024, data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1','Jogging-2','Walking','Walking2']):
+    for data_dir in data_dirs:
+
+        print "Reading Directory:", data_dir
+        vis_data_file = './data/vis_feats_' + data_dir
+        heatmap_data_file = './data/heatmap_feats_' + data_dir
+
+        vis_feat = np.genfromtxt(vis_data_file, dtype='float32', delimiter=',')
+        heatmap_feat = np.genfromtxt(heatmap_data_file, dtype='float32', delimiter=',')
+
+        leng = vis_feat.shape[0]
+        x = np.zeros((leng - sequence_length, sequence_length, (vis_feat_size + heatmap_feat_size)))
+        y = np.zeros((leng - sequence_length, sequence_length, heatmap_feat_size))
+
+        for i in range(leng-sequence_length):
+
+            x_sample = np.zeros((sequence_length, (vis_feat_size + heatmap_feat_size)))
+            y_sample = np.zeros((sequence_length, heatmap_feat_size))
+            for j in range(sequence_length):
+                x_sample[j, :] = np.append(vis_feat_size[i+j], heatmap_feat[i+j])
+                y_sample[j, :] = heatmap_feat[i+j+1]
+
+            x[i] = x_sample
+            y[i] = y_sample
+
+        yield (x,y)
+
+
+
+
+
+def get_test_data(data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1','Jogging-2','Walking','Walking2'], val_data_dirs=['Human3','Human8','Jogging-2','Walking2']):
+
+    x_test = None
+    y_test = None
+    data_generator = read_data(data_dirs=data_dirs)
+    for i,(x,y) in enumerate(data_generator):
+
+        if x_test==None and y_test==None:
+            x_test = x
+            y_test = y
+        else:
+            x_test = np.append(x_test, x, axis=0)
+            y_test = np.append(y_test, y, axis=0)
+
+    print "Shapes of Train/Val X/Y Data:", x_test.shape, y_test.shape
+    return x_test, y_test
