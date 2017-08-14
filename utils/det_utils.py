@@ -68,14 +68,6 @@ extract_feat.restype = FEATURE
 
 global net
 global meta
-global net_dim
-
-net_dim = 608
-
-#net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
-#meta = load_meta("cfg/coco.data")
-os.chdir('../')
-
 
 def detect(net, meta, image, thresh=.5, hier_thresh=.5, nms=.45):
     im = load_image(image, 0, 0)
@@ -99,7 +91,6 @@ def extract(net, n):
     feat = np.zeros((f.size))
     for j in range(f.size):
         feat[j] = f.feat[j]
-    # feat = feat.reshape((19,19,1024))
     return feat
 
 
@@ -156,31 +147,41 @@ def extract_spatio_info(frame_path, n):
     return obj_detections, vis_feat
 
 
-def generate_heatmap_feat(det_x, det_y, det_h, det_w, smap=64):
-    heatmap = np.zeros((smap, smap))
-    scaled_x, scaled_y, scaled_h, scaled_w = int(det_x*smap), int(det_y*smap), int(det_h*smap), int(det_w*smap)
+def generate_heatmap_feat(det_x, det_y, det_h, det_w, hmap_size=64):
+    heatmap = np.zeros((hmap_size, hmap_size))
+    scaled_x, scaled_y, scaled_h, scaled_w = int(det_x*hmap_size), int(det_y*hmap_size), int(det_h*hmap_size), int(det_w*hmap_size)
     heatmap[scaled_y:(scaled_y+scaled_h+1), scaled_x:(scaled_x+scaled_w+1)] = 1.0
     heatmap_feat = heatmap.reshape((-1))
     return heatmap_feat
 
 
+
+
+
+# ====================================================================================================================
+
+
+
+
+
 def process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs):
+
+    net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
+    meta = load_meta("cfg/coco.data")
+    os.chdir('../')
+
     for i, (frame_paths, frame_bboxs, frame_dim) in enumerate(zip(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs)):
         frame_height, frame_width = frame_dim[0], frame_dim[1]
 
-        vis_data_file = './data/TB-50_FEATS/vis_feats_' + data_dirs[i]
-        heatmap_data_file = './data/TB-50_FEATS/heatmap_feats_' + data_dirs[i]
+        vis_data_file = './data/TB-50_FEATS/normal/vis_feats_' + data_dirs[i]
+        heatmap_data_file = './data/TB-50_FEATS/normal/heatmap_feats_' + data_dirs[i]
 
-        # if i<0:
-        #     continue
         with open(vis_data_file, 'wb', 0) as f_vis, open(heatmap_data_file, 'wb', 0) as f_heat:
             print "Extracting Features from Directory:", data_dirs[i].split('-')[0]
             print "Begin.."
             start = time.time()
             for j, (frame_path, frame_bbox) in enumerate(zip(frame_paths,frame_bboxs)):
 
-                # if j<0:
-                #     continue
                 if j%100==0 and j!=0:
                     end = time.time()
                     print "Frames Processed:", j, "| Time Taken:", (end-start)
@@ -202,8 +203,8 @@ def read_data(data_dirs, sequence_length=6, vis_feat_size=1024, heatmap_feat_siz
     for data_dir in data_dirs:
 
         print "Reading Extracted Features from Directory:", data_dir
-        vis_data_file = './data/TB-50_FEATS/vis_feats_' + data_dir
-        heatmap_data_file = './data/TB-50_FEATS/heatmap_feats_' + data_dir
+        vis_data_file = './data/TB-50_FEATS/normal/vis_feats_' + data_dir
+        heatmap_data_file = './data/TB-50_FEATS/normal/heatmap_feats_' + data_dir
 
         vis_feat = np.genfromtxt(vis_data_file, dtype='float32', delimiter=',')
         heatmap_feat = np.genfromtxt(heatmap_data_file, dtype='float32', delimiter=',')
@@ -267,25 +268,54 @@ def get_trainval_data(data_dirs, val_data_dirs):
     print "Shapes of Train/Val X/Y Data:", x_train_vis.shape, x_train_heat.shape, y_train.shape, x_val_vis.shape, x_val_heat.shape, y_val.shape
     return x_train_vis, x_train_heat, y_train, x_val_vis, x_val_heat, y_val
 
+def get_test_data(data_dirs):
+
+    x_test_vis= None
+    x_test_heat = None
+    y_test = None
+
+    data_generator = read_data(data_dirs)
+    for i,(x_vis, x_heat, y) in enumerate(data_generator):
+
+        if x_test_vis is None and x_test_heat is None and y_test is None:
+            x_test_vis = x_vis
+            x_test_heat = x_heat
+            y_test = y
+        else:
+            x_test_vis = np.append(x_test_vis, x_vis, axis=0)
+            x_test_heat = np.append(x_test_heat, x_heat, axis=0)
+            y_test = np.append(y_test, y, axis=0)
+
+    print "Shapes of Test/Val X/Y Data:", x_test_vis.shape, x_test_heat.shape, y_test.shape
+    return x_test_vis, x_test_heat, y_test
+
+
+
+
+
+# -------------------------------------------- SIMPLE MODEL ----------------------------------------------------------
+
+
 
 
 def process_data_simple(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs):
+
+    net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
+    meta = load_meta("cfg/coco.data")
+    os.chdir('../')
+
     for i, (frame_paths, frame_bboxs, frame_dim) in enumerate(zip(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs)):
         frame_height, frame_width = frame_dim[0], frame_dim[1]
 
-        vis_data_file = './data/vis_feats_' + data_dirs[i]
-        heatmap_data_file = './data/heatmap_feats_' + data_dirs[i]
+        vis_data_file = './data/TB-50_FEATS/simple/vis_feats_' + data_dirs[i]
+        heatmap_data_file = './data/TB-50_FEATS/simple/heatmap_feats_' + data_dirs[i]
 
-        # if i<0:
-        #     continue
         with open(vis_data_file, 'wb', 0) as f_vis, open(heatmap_data_file, 'wb', 0) as f_heat:
             print "Extracting Features from Directory:", data_dirs[i].split('-')[0]
             print "Begin.."
             start = time.time()
             for j, (frame_path, frame_bbox) in enumerate(zip(frame_paths,frame_bboxs)):
 
-                # if j<0:
-                #     continue
                 if j%100==0 and j!=0:
                     end = time.time()
                     print "Frames Processed:", j, "| Time Taken:", (end-start)
@@ -309,8 +339,8 @@ def read_data_simple(data_dirs, sequence_length=6, vis_feat_size=1024, heatmap_f
     for data_dir in data_dirs:
 
         print "Reading Extracted Features from Directory:", data_dir
-        vis_data_file = './data/vis_feats_' + data_dir
-        heatmap_data_file = './data/heatmap_feats_' + data_dir
+        vis_data_file = './data/TB-50_FEATS/simple/vis_feats_' + data_dir
+        heatmap_data_file = './data/TB-50_FEATS/simple/heatmap_feats_' + data_dir
 
         vis_feat = np.genfromtxt(vis_data_file, dtype='float32', delimiter=',')
         heatmap_feat = np.genfromtxt(heatmap_data_file, dtype='float32', delimiter=',')
@@ -343,7 +373,7 @@ def get_trainval_data_simple(data_dirs, val_data_dirs):
     y_val = None
 
     val_index = [data_dirs.index(data_dir) for data_dir in val_data_dirs]
-    data_generator = read_data(data_dirs)
+    data_generator = read_data_simple(data_dirs)
     for i, (x, y) in enumerate(data_generator):
 
         if i in val_index:
@@ -365,39 +395,11 @@ def get_trainval_data_simple(data_dirs, val_data_dirs):
     return x_train, y_train, x_val, y_val
 
 
-def read_test_data(sequence_length=6, vis_feat_size=1024, heatmap_feat_size=1024, data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1','Jogging-2','Walking','Walking2']):
-    for data_dir in data_dirs:
-
-        print "Reading Directory:", data_dir
-        vis_data_file = './data/vis_feats_' + data_dir
-        heatmap_data_file = './data/heatmap_feats_' + data_dir
-
-        vis_feat = np.genfromtxt(vis_data_file, dtype='float32', delimiter=',')
-        heatmap_feat = np.genfromtxt(heatmap_data_file, dtype='float32', delimiter=',')
-
-        leng = vis_feat.shape[0]
-        x = np.zeros((leng - sequence_length, sequence_length, (vis_feat_size + heatmap_feat_size)))
-        y = np.zeros((leng - sequence_length, sequence_length, heatmap_feat_size))
-
-        for i in range(leng-sequence_length):
-
-            x_sample = np.zeros((sequence_length, (vis_feat_size + heatmap_feat_size)))
-            y_sample = np.zeros((sequence_length, heatmap_feat_size))
-            for j in range(sequence_length):
-                x_sample[j, :] = np.append(vis_feat_size[i+j], heatmap_feat[i+j])
-                y_sample[j, :] = heatmap_feat[i+j+1]
-
-            x[i] = x_sample
-            y[i] = y_sample
-
-        yield (x,y)
-
-
 def get_test_data_simple(data_dirs):
 
     x_test = None
     y_test = None
-    data_generator = read_data(data_dirs=data_dirs)
+    data_generator = read_data_simple(data_dirs=data_dirs)
     for i,(x,y) in enumerate(data_generator):
 
         if x_test==None and y_test==None:
@@ -409,24 +411,3 @@ def get_test_data_simple(data_dirs):
 
     print "Shapes of Train/Val X/Y Data:", x_test.shape, y_test.shape
     return x_test, y_test
-
-def get_test_data(data_dirs):
-
-    x_test_vis= None
-    x_test_heat = None
-    y_test = None
-
-    data_generator = read_data(data_dirs)
-    for i,(x_vis, x_heat, y) in enumerate(data_generator):
-
-        if x_test_vis is None and x_test_heat is None and y_test is None:
-            x_test_vis = x_vis
-            x_test_heat = x_heat
-            y_test = y
-        else:
-            x_test_vis = np.append(x_test_vis, x_vis, axis=0)
-            x_test_heat = np.append(x_test_heat, x_heat, axis=0)
-            y_test = np.append(y_test, y, axis=0)
-
-    print "Shapes of Test/Val X/Y Data:", x_test_vis.shape, x_test_heat.shape, y_test.shape
-    return x_test_vis, x_test_heat, y_test

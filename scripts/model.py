@@ -44,6 +44,18 @@ def train(x_train_vis, x_train_heat, y_train, x_val_vis, x_val_heat, y_val):
     model.fit([x_train_vis, x_train_heat], y_train, validation_data=([x_val_vis, x_val_heat],y_val), batch_size=32, epochs=200, verbose=1, shuffle=False, callbacks=[checkpointer, earlystopper])
 
 
+def test(x_test,x_heat, y_test):
+    sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
+    with sess.as_default():
+        model = get_model()
+        model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
+        y_out = model.predict([x_test,x_heat],batch_size=32)
+        return y_out
+
+
+
+
+
 def get_model_simple():
 
     lstm_units = 512
@@ -63,7 +75,7 @@ def get_model_simple():
 def train_simple(x_train, y_train, x_val, y_val):
 
     model = get_model()
-    checkpointer = ModelCheckpoint(filepath='weights/weights_simple.{epoch:02d}-{val_loss:.2f}.hdf5', verbose=1, save_best_only=True)
+    checkpointer = ModelCheckpoint(filepath='weights/TB-50_WEIGHTS/weights_simple.{epoch:02d}-{val_loss:.2f}.hdf5', verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=15, verbose=1, mode='auto')
     model.fit(x_train, y_train, validation_data=(x_val,y_val), batch_size=64, epochs=100, verbose=0, shuffle=False, callbacks=[checkpointer, earlystopper])
 
@@ -73,12 +85,4 @@ def test_simple(x_test, y_test):
         model = get_model()
         model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
         y_out = model.predict(x_test,batch_size=32)
-        return y_out
-
-def test(x_test,x_heat, y_test):
-    sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
-    with sess.as_default():
-        model = get_model()
-        model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
-        y_out = model.predict([x_test,x_heat],batch_size=32)
         return y_out
