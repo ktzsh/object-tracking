@@ -5,6 +5,9 @@
 *.csv
 *.h5
 data/*
+weights/*
+demo.mp4
+*.mp4
 
 # Prerequisites
 *.d
