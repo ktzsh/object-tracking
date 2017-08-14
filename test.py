@@ -9,9 +9,12 @@ import time
 import sys
 import os
 
+thresh = 0.5
+hmSize = 32
+
 def findRectangle(heatMap,thresh):
-    minup = 32
-    minleft=32
+    minup = hmSize
+    minleft = hmSize
     maxright=-1
     maxbottom=-1
     for i in range(32):
@@ -25,12 +28,11 @@ def findRectangle(heatMap,thresh):
                     minup =j
                 if j>maxbottom:
                     maxbottom= j
-    return 4*minleft,4*minup,4*maxright,4*maxbottom
+    return minleft,minup,maxright,maxbottom
 
 data_dirs = ['Dancer','Skating1','Girl2']
 
 
-thresh = 0.5
 #frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs = util.prepare_data(data_dirs)
 #util.process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs,data_dirs) #save features to file
 x_test, y_test= util.get_test_data(data_dirs,[])
@@ -49,15 +51,23 @@ for sample in y_predict:
     print i,dir_number
     heatMap = sample[5]
     #print heatMap.shape
-    heatMap = np.resize(heatMap,(32,32))
+    heatMap = np.resize(heatMap,(hmSize,hmSize))
     #print heatMap.shape
     frame_path = path_prefix + current_data_dir + '/img/' + str(i).zfill(4) + '.jpg'
     frame = cv2.imread(frame_path)
-    resized_image = cv2.resize(frame, (128, 128))
+    width = len(frame[0])
+    height = len(frame)
+    #resized_image = cv2.resize(frame, (128, 128))
     top_left_x, top_left_y, bottom_right_x, bottom_right_y = findRectangle(heatMap,thresh)
-    cv2.rectangle(resized_image,(top_left_x,top_left_y),(bottom_right_x,bottom_right_y),(0,0,255),1)
+    ratio1 = height/hmSize
+    ratio2 = width/hmSize
+    top_left_x = top_left_x*ratio1
+    top_left_y = top_left_y*ratio2
+    bottom_right_x = bottom_right_x*ratio1
+    bottom_right_y = bottom_right_y*ratio2
+    cv2.rectangle(frame,(top_left_y,top_left_x),(bottom_right_y,bottom_right_x),(0,0,255),1)
 
-    cv2.imwrite(path_prefix + current_data_dir + '/detection_img/' + str(i).zfill(4) + '.jpg', resized_image)
+    cv2.imwrite(path_prefix + current_data_dir + '/detection_img/' + str(i).zfill(4) + '.jpg', frame)
 
     cv2.imwrite(path_prefix + current_data_dir + '/heatmap_img/' + str(i).zfill(4) + '.jpg', 255*heatMap)
 
