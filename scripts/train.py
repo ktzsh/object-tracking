@@ -67,10 +67,18 @@ def train_simple(x_train, y_train, x_val, y_val):
     earlystopper = EarlyStopping(monitor='val_loss', patience=15, verbose=1, mode='auto')
     model.fit(x_train, y_train, validation_data=(x_val,y_val), batch_size=64, epochs=100, verbose=0, shuffle=False, callbacks=[checkpointer, earlystopper])
 
-def test(x_test, y_test):
+def test_simple(x_test, y_test):
     sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
     with sess.as_default():
         model = get_model()
-        model.load_weights('weights/weights.57-0.03.hdf5')
+        model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
         y_out = model.predict(x_test,batch_size=32)
+        return y_out
+
+def test(x_test,x_heat, y_test):
+    sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
+    with sess.as_default():
+        model = get_model()
+        model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
+        y_out = model.predict([x_test,x_heat],batch_size=32)
         return y_out

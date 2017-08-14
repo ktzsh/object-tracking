@@ -71,8 +71,9 @@ global meta
 global net_dim
 
 net_dim = 608
-net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
-meta = load_meta("cfg/coco.data")
+
+#net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
+#meta = load_meta("cfg/coco.data")
 os.chdir('../')
 
 
@@ -392,7 +393,7 @@ def read_test_data(sequence_length=6, vis_feat_size=1024, heatmap_feat_size=1024
         yield (x,y)
 
 
-def get_test_data(data_dirs):
+def get_test_data_simple(data_dirs):
 
     x_test = None
     y_test = None
@@ -408,3 +409,24 @@ def get_test_data(data_dirs):
 
     print "Shapes of Train/Val X/Y Data:", x_test.shape, y_test.shape
     return x_test, y_test
+
+def get_test_data(data_dirs):
+
+    x_test_vis= None
+    x_test_heat = None
+    y_test = None
+
+    data_generator = read_data(data_dirs)
+    for i,(x_vis, x_heat, y) in enumerate(data_generator):
+
+        if x_test_vis is None and x_test_heat is None and y_test is None:
+            x_test_vis = x_vis
+            x_test_heat = x_heat
+            y_test = y
+        else:
+            x_test_vis = np.append(x_test_vis, x_vis, axis=0)
+            x_test_heat = np.append(x_test_heat, x_heat, axis=0)
+            y_test = np.append(y_test, y, axis=0)
+
+    print "Shapes of Test/Val X/Y Data:", x_test_vis.shape, x_test_heat.shape, y_test.shape
+    return x_test_vis, x_test_heat, y_test

@@ -30,19 +30,19 @@ def findRectangle(heatMap,thresh):
                     maxbottom= j
     return minleft,minup,maxright,maxbottom
 
-data_dirs = ['Dancer','Skating1','Girl2']
+data_dirs = ['Human8']
 
-frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs = util.prepare_data(data_dirs)
-util.process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs,data_dirs) #save features to file
+#frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs = util.prepare_data(data_dirs)
+#util.process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs,data_dirs) #save features to file
 
-x_test, y_test= util.get_test_data(data_dirs,[])
-y_predict = trainer.test(x_test, y_test)
+x_test,x_test_heat, y_test= util.get_test_data(data_dirs)
+y_predict = trainer.test(x_test,x_test_heat, y_test)
 print y_predict.shape
 print y_predict[0]
 f1=open('./data/test_output/y_predict.txt', 'wb')
 f1.write(y_predict)
 f1.close()
-path_prefix = './data/TB-50_FEATS/'
+path_prefix = './data/TB-50/'
 i=6
 dir_number = 0
 current_data_dir = data_dirs[dir_number]
@@ -55,8 +55,9 @@ for sample in y_predict:
     #print heatMap.shape
     frame_path = path_prefix + current_data_dir + '/img/' + str(i).zfill(4) + '.jpg'
     frame = cv2.imread(frame_path)
-    width = len(frame[0])
-    height = len(frame)
+    height, width, channels = frame.shape
+    #width = len(frame[0])
+    #height = len(frame)
     #resized_image = cv2.resize(frame, (128, 128))
     top_left_x, top_left_y, bottom_right_x, bottom_right_y = findRectangle(heatMap,thresh)
     ratio1 = height/hmSize
@@ -71,15 +72,16 @@ for sample in y_predict:
 
     cv2.imwrite(path_prefix + current_data_dir + '/heatmap_img/' + str(i).zfill(4) + '.jpg', 255*heatMap)
 
-
-    if dir_number is 0 and i is 225:
+'''
+    if dir_number is 0 and i is 1500:
         dir_number = 1
         i = 6
         print current_data_dir +"Done"
         current_data_dir = data_dirs[dir_number]
     print i,dir_number
-    if dir_number == 1 and i == 400:
+    if dir_number == 1 and i == 225:
         dir_number = 2
         i = 6
         print current_data_dir +"Done"
         current_data_dir = data_dirs[dir_number]
+'''
