@@ -117,7 +117,7 @@ def prepare_data(data_dirs):
                     frame = cv2.imread(frame_path)
                     frame_height, frame_width, frame_channel = frame.shape[0], frame.shape[1], frame.shape[2]
 
-                if data_dir=='Jogging-1' or data_dir=='Jogging-2' or data_dir=='Woman' or data_dir=='Walking' or data_dir=='Walking2' or data_dir=='Subway' or data_dir=='Singer1':
+                if data_dir=='Jogging-1' or data_dir=='Jogging-2' or data_dir=='Woman' or data_dir=='Walking' or data_dir=='Walking2' or data_dir=='Subway' or data_dir=='Singer1' or data_dir=='Girl':
                     frame_bbox = line.rstrip('\n').split()
                     frame_bboxs.append(frame_bbox)
                 else:
