@@ -8,6 +8,7 @@ from keras.layers.merge import concatenate
 from keras.models import Model, load_model
 from keras.layers.wrappers import TimeDistributed
 from keras.preprocessing.sequence import pad_sequences
+import h5py
 
 def get_model():
 
@@ -64,4 +65,12 @@ def train_simple(x_train, y_train, x_val, y_val):
     model = get_model()
     checkpointer = ModelCheckpoint(filepath='weights/weights_simple.{epoch:02d}-{val_loss:.2f}.hdf5', verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=15, verbose=1, mode='auto')
-    model.fit(x_train, y_train, validation_data=(x_val, y_val), batch_size=64, epochs=200, verbose=1, shuffle=False, callbacks=[checkpointer, earlystopper])
+    model.fit(x_train, y_train, validation_data=(x_val,y_val), batch_size=64, epochs=100, verbose=0, shuffle=False, callbacks=[checkpointer, earlystopper])
+
+def test(x_test, y_test):
+    sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
+    with sess.as_default():
+        model = get_model()
+        model.load_weights('weights/weights.57-0.03.hdf5')
+        y_out = model.predict(x_test,batch_size=32)
+        return y_out
