@@ -26,8 +26,8 @@ class METADATA(Structure):
 class FEATURE(Structure):
     _fields_ = [("size", c_int),
                 ("feat", POINTER(c_float))]
-os.chdir('./darknet')
-lib = CDLL("./libdarknet.so", RTLD_GLOBAL)
+
+lib = CDLL("./darknet/libdarknet.so", RTLD_GLOBAL)
 
 make_boxes = lib.make_boxes
 make_boxes.argtypes = [c_void_p]
@@ -66,8 +66,6 @@ extract_feat = lib.network_extract_feat
 extract_feat.argtypes = [c_void_p, c_int]
 extract_feat.restype = FEATURE
 
-global net
-global meta
 
 def detect(net, meta, image, thresh=.5, hier_thresh=.5, nms=.45):
     im = load_image(image, 0, 0)
@@ -166,6 +164,9 @@ def generate_heatmap_feat(det_x, det_y, det_h, det_w, hmap_size=64):
 
 def process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs):
 
+    os.chdir('./darknet')
+    global net
+    global meta
     net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
     meta = load_meta("cfg/coco.data")
     os.chdir('../')
@@ -300,6 +301,9 @@ def get_test_data(data_dirs):
 
 def process_data_simple(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs):
 
+    os.chdir('./darknet')
+    global net
+    global meta
     net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
     meta = load_meta("cfg/coco.data")
     os.chdir('../')

@@ -37,7 +37,7 @@ data_dirs = ['Human8']
 if sys.argv[1]=='simple':
     x_test, y_test = util.get_test_data_simple(data_dirs)
     y_predict = model_h.test_simple(x_test, y_test)
-else:
+elif sys.argv[1]=='normal':
     x_test_vis, x_test_heat, y_test= util.get_test_data(data_dirs)
     y_predict = model_h.test(x_test_vis, x_test_heat, y_test)
 
