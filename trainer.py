@@ -2,7 +2,7 @@ import sys
 import utils.det_utils as util
 import scripts.model as model_h
 
-data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1','Jogging-2','Walking','Walking2', 'Biker','Subway', 'Skater', 'Singer1', 'Walking2', 'Jumping', 'Jump', 'Skating1', 'Girl']
+data_dirs = ['Human2','Human3','Human4','Human5','Human6','Human7','Human8','Human9','Woman','Jogging-1','Jogging-2','Walking','Walking2', 'Biker','Subway', 'Skater', 'Singer1', 'Walking2', 'Jumping', 'Jump', 'Skating1', 'Girl', 'Girl2', 'Dancer']
 val_data_dirs=['Human3','Human8','Jogging-2', 'Skater', 'Jump', 'Girl2', 'Dancer']
 
 
