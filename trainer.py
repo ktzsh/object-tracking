@@ -19,8 +19,8 @@ elif sys.argv[1]=='train':
     print "INFO: Training on Subset Data TB-50 Initiated.."
     if sys.argv[2]=='simple':
         print "INFO: Simple Model Chosen.."
-        x_train_vis, x_train_heat, y_train, x_val_vis, x_val_heat, y_val = util.get_trainval_data_simple(data_dirs, val_data_dirs)
-        model_h.train_simple(x_train_vis, x_train_heat, y_train, x_val_vis, x_val_heat, y_val)
+        x_train, y_train, x_val, y_val = util.get_trainval_data_simple(data_dirs, val_data_dirs)
+        model_h.train_simple(x_train, y_train, x_val, y_val)
     elif sys.argv[2]=='normal':
         print "INFO: Deeper Model Chosen.."
         x_train_vis, x_train_heat, y_train, x_val_vis, x_val_heat, y_val = util.get_trainval_data(data_dirs, val_data_dirs)
