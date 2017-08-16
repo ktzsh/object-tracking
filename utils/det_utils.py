@@ -153,7 +153,56 @@ def generate_heatmap_feat(det_x, det_y, det_h, det_w, hmap_size=64):
     return heatmap_feat
 
 
+def generate_rectangle_from_heatmap(heat_map, thresh=0.75, hmap_size=64):
+    x1 = hmap_size
+    y1 = hmap_size
+    y2 = -1
+    x2 = -1
 
+    for i in range(hmap_size):
+        for j in range(hmap_size):
+            if heat_map[i][j] >= thresh:
+                if i < y1:
+                    y1 = i
+                if i > y2:
+                    y2 = i
+                if j < x1:
+                    x1 = j
+                if j > x2:
+                    x2 = j
+
+    return x1, y1, x2, y2
+
+
+def overlap_score(y_true, y_pred):
+
+    x1_true = y_true[0]
+    y1_true = y_true[1]
+    x2_true = y_true[2]
+    y2_true = y_true[3]
+
+    x1_pred = y_pred[0]
+    y1_pred = y_pred[1]
+    x2_pred = y_pred[2]
+    y2_pred = y_pred[3]
+
+    x1 = max(x1_true, x1_pred)
+    y1 = max(y1_true, y1_pred)
+    x2 = min(x2_true, x2_pred)
+    y2 = min(y2_true, y2_pred)
+    intersection = float(abs((x1 - x2) * (y1 - y2)))
+    union = float(abs((x1_true - x2_true) * (y1_true - y2_true))) + float(abs((x1_pred - x2_pred) * (y1_pred - y2_pred))) - intersection
+
+    return (intersection/union)
+
+def average_overlap_score(y_true, y_pred):
+
+    score = 0.0
+    total = 0
+    for i, (y_true_sample, y_pred_sample) in enumerate(zip(y_true, y_pred)):
+        score += overlap_score(y_true_sample, y_pred_sample)
+        total = i
+    return score/(total+1)
 
 
 # ====================================================================================================================

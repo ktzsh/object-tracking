@@ -1,9 +1,7 @@
 from ctypes import *
 import os
 
-os.chdir('darknet')
-lib = CDLL("/root/workspace/PedestrainDetection/darknet/libdarknet.so", RTLD_GLOBAL)
-# lib = CDLL("/Volumes/Common/Common-Workspace/PedestrainDetection/darknet/libdarknet.so", RTLD_GLOBAL)
+lib = CDLL("./darknet/libdarknet.so", RTLD_GLOBAL)
 
 run_demo = lib.demo
 run_demo.argtypes = [c_char_p, c_char_p, c_float, c_int, c_char_p, POINTER(c_char_p), c_int, c_int, c_char_p, c_int, c_float, c_int, c_int, c_int, c_int]
@@ -25,9 +23,13 @@ get_labels = lib.get_labels
 get_labels.argtypes = [c_char_p]
 get_labels.restype = POINTER(c_char_p)
 
-options = read_data_cfg('cfg/coco.data')
-classes = option_find_int(options, 'classes', 20)
-name_list = option_find_str(options, 'names', 'data/names.list')
-names = get_labels(name_list)
-run_demo('cfg/yolo.cfg', 'yolo.weights', 0.24, 0, '/root/workspace/PedestrainDetection/demo.mp4', names, classes, 0, '../data/video/demo', 3, 0.5, 0, 0, 0, 0)
-# run_demo('cfg/yolo.cfg', 'yolo.weights', 0.24, 0, '/Volumes/Common/Common-Workspace/PedestrainDetection/demo.mp4', names, classes, 0, None, 3, 0.5, 0, 0, 0, 0)
+
+def run_yolo_sequence():
+
+    os.chdir('darknet')
+    options = read_data_cfg('cfg/coco.data')
+    classes = option_find_int(options, 'classes', 20)
+    name_list = option_find_str(options, 'names', 'data/names.list')
+    names = get_labels(name_list)
+    run_demo('cfg/yolo.cfg', 'yolo.weights', 0.24, 0, '/root/workspace/PedestrainDetection/demo.mp4', names, classes, 0, '../data/video/demo', 3, 0.5, 0, 0, 0, 0)
+    os.chdir('../')

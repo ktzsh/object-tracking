@@ -10,6 +10,10 @@ from keras.layers.wrappers import TimeDistributed
 from keras.preprocessing.sequence import pad_sequences
 import h5py
 
+
+#  --------------------------------------------------------------------------------------------------------------------
+
+
 def get_model():
 
     lstm_units = 512
@@ -48,7 +52,7 @@ def test(x_test,x_heat, y_test):
     sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
     with sess.as_default():
         model = get_model()
-        # model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
+        model.load_weights('weights/TB-50_WEIGHTS/weights.25-0.02.hdf5')
         y_out = model.predict([x_test,x_heat],batch_size=32)
         return y_out
 
@@ -77,12 +81,12 @@ def train_simple(x_train, y_train, x_val, y_val):
     model = get_model_simple()
     checkpointer = ModelCheckpoint(filepath='weights/TB-50_WEIGHTS/weights_simple.{epoch:02d}-{val_loss:.2f}.hdf5', verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=15, verbose=1, mode='auto')
-    model.fit(x_train, y_train, validation_data=(x_val,y_val), batch_size=64, epochs=200, verbose=0, shuffle=False, callbacks=[checkpointer, earlystopper])
+    model.fit(x_train, y_train, validation_data=(x_val,y_val), batch_size=64, epochs=200, verbose=1, shuffle=False, callbacks=[checkpointer, earlystopper])
 
 def test_simple(x_test, y_test):
     sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}, log_device_placement=False))
     with sess.as_default():
         model = get_model_simple()
-        # model.load_weights('weights/TB-50_WEIGHTS/weights.14-0.02.hdf5')
+        model.load_weights('weights/TB-50_WEIGHTS/weights_simple.40-0.02.hdf5')
         y_out = model.predict(x_test,batch_size=32)
         return y_out
