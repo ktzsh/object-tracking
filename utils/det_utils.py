@@ -108,6 +108,10 @@ def prepare_data(data_dirs):
             groundtruth_path = path_prefix + 'Jogging' + '/groundtruth_rect.2.txt'
         if data_dir=='Human4-1':
             groundtruth_path = path_prefix + 'Human4' + '/groundtruth_rect.1.txt'
+        if data_dir=='Skating2-1':
+            groundtruth_path = path_prefix + 'Skating2' + '/groundtruth_rect.1.txt'
+        if data_dir=='Skating2-2':
+            groundtruth_path = path_prefix + 'Skating2' + '/groundtruth_rect.2.txt'
 
         with open(groundtruth_path, 'rb') as f_handle:
             lines = f_handle.readlines()
@@ -117,7 +121,7 @@ def prepare_data(data_dirs):
                     frame = cv2.imread(frame_path)
                     frame_height, frame_width, frame_channel = frame.shape[0], frame.shape[1], frame.shape[2]
 
-                if data_dir=='Jogging-1' or data_dir=='Jogging-2' or data_dir=='Woman' or data_dir=='Walking' or data_dir=='Walking2' or data_dir=='Subway' or data_dir=='Singer1' or data_dir=='Girl':
+                if data_dir=='Jogging-1' or data_dir=='Jogging-2' or data_dir=='Woman' or data_dir=='Walking' or data_dir=='Walking2' or data_dir=='Subway' or data_dir=='Singer1' or data_dir=='Girl' or data_dir=='BlurBody' or data_dir=='Car4' or data_dir=='CarScale' or data_dir=='Skating2-1' or data_dir=='Skating2-2' :
                     frame_bbox = line.rstrip('\n').split()
                     frame_bboxs.append(frame_bbox)
                 else:
@@ -249,7 +253,7 @@ def process_data(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data_dirs):
                 np.savetxt(f_heat, (heatmap_feat.reshape((1,-1))), delimiter=',')
 
 
-def read_data(data_dirs, sequence_length=6, vis_feat_size=1024, heatmap_feat_size=4096):
+def read_data(data_dirs, sequence_length=4, vis_feat_size=1024, heatmap_feat_size=4096):
     for data_dir in data_dirs:
 
         print "Reading Extracted Features from Directory:", data_dir
@@ -263,81 +267,94 @@ def read_data(data_dirs, sequence_length=6, vis_feat_size=1024, heatmap_feat_siz
 
         leng = vis_feat.shape[0]
         x_vis = np.zeros((leng - sequence_length, sequence_length, 19, 19, vis_feat_size))
+        x_vis_next = np.zeros((leng - sequence_length, 1, 19, 19, vis_feat_size))
         x_heat = np.zeros((leng - sequence_length, sequence_length, heatmap_feat_size))
         y = np.zeros((leng - sequence_length, sequence_length, heatmap_feat_size))
 
         for i in range(leng-sequence_length):
 
             x_sample_vis = np.zeros((sequence_length, 19, 19, vis_feat_size))
+            x_sample_vis_next = np.zeros((1, 19, 19, vis_feat_size))
             x_sample_heat = np.zeros((sequence_length, heatmap_feat_size))
             y_sample = np.zeros((sequence_length, heatmap_feat_size))
             for j in range(sequence_length):
                 x_sample_vis[j, :, :, :] = vis_feat[i+j]
+                x_sample_vis_next[0, :, :, :] = vis_feat[i+j+1]
                 x_sample_heat[j, :] = heatmap_feat[i+j]
                 y_sample[j, :] = heatmap_feat[i+j+1]
 
             x_vis[i] = x_sample_vis
+            x_vis_next = x_sample_vis_next
             x_heat[i] = x_sample_heat
             y[i] = y_sample
 
-        yield (x_vis, x_heat, y)
+        yield (x_vis, x_vis_next, x_heat, y)
 
 
 def get_trainval_data(data_dirs, val_data_dirs):
 
     x_train_vis = None
+    x_train_vis_next = None
     x_train_heat = None
     y_train = None
     x_val_vis = None
+    x_val_vis_next = None
     x_val_heat = None
     y_val = None
 
     val_index = [data_dirs.index(data_dir) for data_dir in val_data_dirs]
     data_generator = read_data(data_dirs)
-    for i,(x_vis, x_heat, y) in enumerate(data_generator):
+    for i,(x_vis, x_vis_next, x_heat, y) in enumerate(data_generator):
 
         if i in val_index:
             if x_val_vis is None and x_val_heat is None and y_val is None:
                 x_val_vis = x_vis
+                x_val_vis_next = x_vis_next
                 x_val_heat = x_heat
                 y_val = y
             else:
                 x_val_vis = np.append(x_val_vis, x_vis, axis=0)
+                x_val_vis_next = np.append(x_val_vis_next, x_vis_next, axis=0)
                 x_val_heat = np.append(x_val_heat, x_heat, axis=0)
                 y_val = np.append(y_val, y, axis=0)
         else:
             if x_train_vis is None and x_train_heat is None and y_train is None:
                 x_train_vis = x_vis
+                x_train_vis_next = x_vis_next
                 x_train_heat = x_heat
                 y_train = y
             else:
                 x_train_vis = np.append(x_train_vis, x_vis, axis=0)
+                x_train_vis_next = np.append(x_train_vis_next, x_vis_next, axis=0)
                 x_train_heat = np.append(x_train_heat, x_heat, axis=0)
                 y_train = np.append(y_train, y, axis=0)
 
-    print "Shapes of Train/Val X/Y Data:", x_train_vis.shape, x_train_heat.shape, y_train.shape, x_val_vis.shape, x_val_heat.shape, y_val.shape
-    return x_train_vis, x_train_heat, y_train, x_val_vis, x_val_heat, y_val
+    print "Shapes of Train/Val X/Y Data:", x_train_vis.shape, x_train_vis_next.shape, x_train_heat.shape, y_train.shape, x_val_vis.shape, x_val_vis_next.shape, x_val_heat.shape, y_val.shape
+    return x_train_vis, x_train_vis_next, x_train_heat, y_train, x_val_vis, x_val_vis_next, x_val_heat, y_val
 
 def get_test_data(data_dirs):
 
     x_test_vis= None
+    x_test_vis_next= None
     x_test_heat = None
     y_test = None
 
     data_generator = read_data(data_dirs)
-    for i,(x_vis, x_heat, y) in enumerate(data_generator):
+    for i,(x_vis, x_vis_next, x_heat, y) in enumerate(data_generator):
 
         if x_test_vis is None and x_test_heat is None and y_test is None:
             x_test_vis = x_vis
+            x_test_vis_next = x_vis_next
             x_test_heat = x_heat
             y_test = y
         else:
             x_test_vis = np.append(x_test_vis, x_vis, axis=0)
+            x_test_vis_next = np.append(x_test_vis_next, x_vis_next, axis=0)
             x_test_heat = np.append(x_test_heat, x_heat, axis=0)
             y_test = np.append(y_test, y, axis=0)
 
-    print "Shapes of Test/Val X/Y Data:", x_test_vis.shape, x_test_heat.shape, y_test.shape
-    return x_test_vis, x_test_heat, y_test
+    print "Shapes of Test/Val X/Y Data:", x_test_vis.shape, x_test_vis_next.shape, x_test_heat.shape, y_test.shape
+    return x_test_vis, x_test_vis_next, x_test_heat, y_test
 
 
 
@@ -388,7 +405,7 @@ def process_data_simple(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs, data
                 np.savetxt(f_heat, (heatmap_feat.reshape((1,-1))), delimiter=',')
 
 
-def read_data_simple(data_dirs, sequence_length=6, vis_feat_size=1024, heatmap_feat_size=4096):
+def read_data_simple(data_dirs, sequence_length=4, vis_feat_size=1024, heatmap_feat_size=4096):
     for data_dir in data_dirs:
 
         print "Reading Extracted Features from Directory:", data_dir
@@ -402,65 +419,78 @@ def read_data_simple(data_dirs, sequence_length=6, vis_feat_size=1024, heatmap_f
 
         leng = vis_feat.shape[0]
         x = np.zeros((leng - sequence_length, sequence_length, vis_feat_size + heatmap_feat_size))
+        x_next = np.zeros((leng - sequence_length, 1, vis_feat_size))
         y = np.zeros((leng - sequence_length, sequence_length, heatmap_feat_size))
 
         for i in range(leng-sequence_length):
 
             x_sample = np.zeros((sequence_length, vis_feat_size + heatmap_feat_size))
+            x_sample_next = np.zeros((1, vis_feat_size))
             y_sample = np.zeros((sequence_length, heatmap_feat_size))
             for j in range(sequence_length):
                 x_sample[j, :] = np.append(vis_feat[i+j], heatmap_feat[i+j])
+                x_sample_next[0] = vis_feat[i+j+1]
                 y_sample[j, :] = heatmap_feat[i+j+1]
 
             x[i] = x_sample
+            x_next[i] = x_sample_next
             y[i] = y_sample
 
-        yield (x, y)
+        yield (x, x_next, y)
 
 
 def get_trainval_data_simple(data_dirs, val_data_dirs):
 
     x_train = None
+    x_train_next = None
     y_train = None
     x_val = None
+    x_val_next = None
     y_val = None
 
     val_index = [data_dirs.index(data_dir) for data_dir in val_data_dirs]
     data_generator = read_data_simple(data_dirs)
-    for i, (x, y) in enumerate(data_generator):
+    for i, (x, x_next, y) in enumerate(data_generator):
 
         if i in val_index:
-            if x_val is None and y_val is None:
+            if x_val is None and x_val_next is None and y_val is None:
                 x_val = x
+                x_val_next = x_next
                 y_val = y
             else:
                 x_val = np.append(x_val, x, axis=0)
+                x_val_next = np.append(x_val_next, x_next, axis=0)
                 y_val = np.append(y_val, y, axis=0)
         else:
-            if x_train is None and y_train is None:
+            if x_train is None and x_train_next is None and y_train is None:
                 x_train = x
+                x_train_next = x_next
                 y_train = y
             else:
                 x_train = np.append(x_train, x, axis=0)
+                x_train_next = np.append(x_train_next, x_next, axis=0)
                 y_train = np.append(y_train, y, axis=0)
 
-    print "Shapes of Train/Val X/Y Data:", x_train.shape, y_train.shape, x_val.shape, y_val.shape
-    return x_train, y_train, x_val, y_val
+    print "Shapes of Train/Val X/Y Data:", x_train.shape, x_train_next.shape, y_train.shape, x_val.shape, x_val_next.shape, y_val.shape
+    return x_train, x_train_next, y_train, x_val, x_val_next, y_val
 
 
 def get_test_data_simple(data_dirs):
 
     x_test = None
+    x_test_next = None
     y_test = None
     data_generator = read_data_simple(data_dirs=data_dirs)
-    for i,(x,y) in enumerate(data_generator):
+    for i,(x, x_next, y) in enumerate(data_generator):
 
-        if x_test==None and y_test==None:
+        if x_test is None and x_test_next is None and y_test is None:
             x_test = x
+            x_test_next = x_next
             y_test = y
         else:
             x_test = np.append(x_test, x, axis=0)
+            x_test_next = np.append(x_test_next, x_next, axis=0)
             y_test = np.append(y_test, y, axis=0)
 
-    print "Shapes of Train/Val X/Y Data:", x_test.shape, y_test.shape
-    return x_test, y_test
+    print "Shapes of Train/Val X/Y Data:", x_test.shape, x_test_next.shape, y_test.shape
+    return x_test, x_test_next, y_test

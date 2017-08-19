@@ -86,11 +86,11 @@ elif sys.argv[2]=='large':
 
 if sys.argv[1]=='simple':
     for (data_dir, frame_bboxs) in zip(data_dirs, frame_bboxs_dirs):
-        x_test, y_test = util.get_test_data_simple([data_dir])
-        y_predict = model_h.test_simple(x_test, y_test)
+        x_test, x_test_next, y_test = util.get_test_data_simple([data_dir])
+        y_predict = model_h.test_simple(x_test, x_test_next, y_test)
         evaluate_dir(y_predict, data_dir, frame_bboxs, flag=flag)
 elif sys.argv[1]=='normal':
     for (data_dir, frame_bboxs) in zip(data_dirs, frame_bboxs_dirs):
-        x_test_vis, x_test_heat, y_test= util.get_test_data([data_dir])
-        y_predict = model_h.test(x_test_vis, x_test_heat, y_test)
+        x_test_vis, x_test_vis_next, x_test_heat, y_test= util.get_test_data([data_dir])
+        y_predict = model_h.test(x_test_vis, x_test_vis_next, x_test_heat, y_test)
         evaluate_dir(y_predict, data_dir, frame_bboxs, flag=flag)
