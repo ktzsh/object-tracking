@@ -1,0 +1,6 @@
+[submodule "darknet"]
+	path = darknet
+	url = https://github.com/kshitiz38/darknet.git
+[submodule "py-faster-rcnn"]
+	path = py-faster-rcnn
+	url = https://github.com/rbgirshick/py-faster-rcnn.git
