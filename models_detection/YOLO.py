@@ -75,46 +75,70 @@ layer_dims.argtypes = [c_void_p, c_int]
 layer_dims.restype = DIMS
 
 
-def load_detection_model():
-    os.chdir('./darknet')
-    net = load_net("cfg/yolo.cfg", "yolo.weights", 0)
-    meta = load_meta("cfg/coco.data")
-    os.chdir('../')
-    return net, meta
+class YOLO:
+    net         = None
+    meta        = None
+    gpu_id      = 1
+    cpu_mode    = 0
+    NMS         = 0.45
+    THRESH      = 0.5
+    HIER_THRESH = 0.5
 
-def detect(net, meta, image, thresh=.5, hier_thresh=.5, nms=.45):
-    im = load_image(image, 0, 0)
-    boxes = make_boxes(net)
-    probs = make_probs(net)
-    num =   num_boxes(net)
-    network_detect(net, im, thresh, hier_thresh, nms, boxes, probs)
-    res = []
-    for j in range(num):
-        for i in range(meta.classes):
-            if probs[j][i] > 0:
-                res.append((meta.names[i], probs[j][i], (boxes[j].x, boxes[j].y, boxes[j].w, boxes[j].h)))
-    res = sorted(res, key=lambda x: -x[1])
-    free_image(im)
-    free_ptrs(cast(probs, POINTER(c_void_p)), num)
-    return res
+    META        = 'cfg/coco.data'
+    CONFIG      = 'cfg/yolo.cfg'
+    WEIGHTS     = 'yolo.weights'
+    CLASSES     = ['car', 'truck', 'person']
 
-def extract(net, n):
-    f = extract_feat(net, n)
-    feat = np.zeros((f.size))
-    for j in range(f.size):
-        feat[j] = f.feat[j]
-    return feat
+    def __init__(self, argvs=[]):
+        self.argv_parser(argvs)
+        self.load_detection_model()
 
-def extract_spatio_info(net, meta, frame_path, n):
-    obj_detections = []
-    out = detect(net, meta, frame_path)
-    vis_feat = extract(net, n)
+    def argv_parser(self, argvs):
+        self.cpu_mode = argvs[0]
+        self.gpu_id = argvs[1]
 
-    for detection in out:
-        if detection[0]=='car' or detection[0]=='truck' or detection[0]=='person':
-            obj_detections.append(detection)
-    return obj_detections, vis_feat
+    def load_detection_model(self):
+        os.chdir('./darknet')
+        if self.cpu_mode:
+            self.net = load_net(self.CONFIG, self.WEIGHTS, 0)
+        else:
+            self.net = load_net_gpu(self.CONFIG, self.WEIGHTS, 0, self.gpu_id)
+        self.meta = load_meta(self.WEIGHTS)
+        os.chdir('../')
 
-def get_layer_dims(net, n):
-    info = layer_dims(net, n)
-    return (info.w, info.h, info.c)
+    def get_layer_dims(self, n):
+        info = layer_dims(self.net, n)
+        return (info.w, info.h, info.c)
+
+    def detect(self, image):
+        im = load_image(image, 0, 0)
+        boxes = make_boxes(self.net)
+        probs = make_probs(self.net)
+        num =   num_boxes(self.net)
+        network_detect(self.net, im, self.THRESH, self.HIER_THRESH, self.NMS, boxes, probs)
+        res = []
+        for j in range(num):
+            for i in range(self.meta.classes):
+                if probs[j][i] > 0:
+                    res.append((self.meta.names[i], probs[j][i], (boxes[j].x, boxes[j].y, boxes[j].w, boxes[j].h)))
+        res = sorted(res, key=lambda x: -x[1])
+        free_image(im)
+        free_ptrs(cast(probs, POINTER(c_void_p)), num)
+        return res
+
+    def extract(self, n):
+        f = extract_feat(self.net, n)
+        feat = np.zeros((f.size))
+        for j in range(f.size):
+            feat[j] = f.feat[j]
+        return feat
+
+    def extract_spatio_info(self, frame_path, layer=24):
+        obj_detections = []
+        out = detect(self.net, self.meta, frame_path)
+        vis_feat = extract(layer)
+
+        for detection in out:
+            if detection[0] in self.CLASSES:
+                obj_detections.append(detection)
+        return obj_detections, vis_feat
