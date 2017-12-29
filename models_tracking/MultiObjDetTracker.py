@@ -4,11 +4,13 @@ import imgaug as ia
 from tqdm import tqdm
 import numpy as np
 from imgaug import augmenters as iaa
-from utils.preprocessing import parse_annotation, BatchGenerator, BatchSequenceGenerator
+from utils.preprocessing import parse_annotation, create_sequences_from_parsed_annotations, BatchGenerator, BatchSequenceGenerator
 from utils.utils import WeightReader, decode_netout, draw_boxes, normalize
 
 import tensorflow as tf
 import keras.backend as K
+K.set_learning_phase(1)
+
 from keras.models import Sequential, Model
 from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, Flatten, Dense, Lambda, ConvLSTM2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -144,7 +146,7 @@ class MultiObjDetTracker:
             self.model = self.model_detector
 
 
-    def loss_fxn(self, y_true, y_pred, tboxes):
+    def loss_fxn(self, y_true, y_pred, tboxes, message=''):
         mask_shape = tf.shape(y_true)[:4]
 
         cell_x = tf.to_float(tf.reshape(tf.tile(tf.range(self.GRID_W), [self.GRID_H]), (1, self.GRID_H, self.GRID_W, 1, 1)))
@@ -301,24 +303,21 @@ class MultiObjDetTracker:
         total_recall = tf.assign_add(total_recall, current_recall)
 
         # loss = tf.Print(loss, [tf.zeros((1))], message='Dummy Line \t', summarize=1000)
-        loss = tf.Print(loss, [tf.zeros((1))], message=('DEBUG: LOSS INFO'), summarize=1000)
-        loss = tf.Print(loss, [loss_xy], message='Loss XY \t', summarize=1000)
-        loss = tf.Print(loss, [loss_wh], message='Loss WH \t', summarize=1000)
-        loss = tf.Print(loss, [loss_conf], message='Loss Conf \t', summarize=1000)
-        loss = tf.Print(loss, [loss_class], message='Loss Class \t', summarize=1000)
-        loss = tf.Print(loss, [loss], message='Total Loss \t', summarize=1000)
-        loss = tf.Print(loss, [current_recall], message='Current Recall \t', summarize=1000)
-        loss = tf.Print(loss, [total_recall/seen], message='Average Recall \t', summarize=1000)
+        loss = tf.Print(loss, [tf.zeros((1))], message=('LOSS INFO'), summarize=1000)
+        loss = tf.Print(loss, [loss_xy], message=message+'Loss XY \t', summarize=1000)
+        loss = tf.Print(loss, [loss_wh], message=message+'Loss WH \t', summarize=1000)
+        loss = tf.Print(loss, [loss_conf], message=message+'Loss Conf \t', summarize=1000)
+        loss = tf.Print(loss, [loss_class], message=message+'Loss Class \t', summarize=1000)
+        loss = tf.Print(loss, [loss], message=message+'Total Loss \t', summarize=1000)
+        loss = tf.Print(loss, [current_recall], message=message+'Current Recall', summarize=1000)
+        loss = tf.Print(loss, [total_recall/seen], message=message+'Average Recall', summarize=1000)
         return loss
 
     def custom_loss_detect(self, y_true, y_pred):
         return self.loss_fxn(y_true, y_pred, tboxes=self.true_boxes)
 
-    def custom_loss_track(self, y_true, y_pred):
 
-        # 1 4 13 13 5 35
-        return y_pred
-
+    def custom_loss_dtrack(self, y_true, y_pred):
         tboxes    = self.true_boxes
         new_shape = self.BATCH_SIZE * self.SEQUENCE_LENGTH
 
@@ -326,12 +325,18 @@ class MultiObjDetTracker:
         y_true = tf.reshape(y_true, (new_shape, self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS))
         tboxes = tf.reshape(tboxes, (new_shape, 1, 1, 1, self.TRUE_BOX_BUFFER , 4))
 
-        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes)
-        # loss = tf.reshape(loss, (-1, 1))
+        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes, message='[DETECTOR]')
+        return loss
 
-        loss = tf.Print(loss, [tf.shape(y_pred)], message='DEBUG Y_PRED', summarize=1000)
-        loss = tf.Print(loss, [tf.shape(y_true)], message='DEBUG Y_TRUE', summarize=1000)
-        loss = tf.Print(loss, [tf.shape(loss)], message='DEBUG LOSS', summarize=1000)
+    def custom_loss_ttrack(self, y_true, y_pred):
+        tboxes    = self.true_boxes
+        new_shape = self.BATCH_SIZE * self.SEQUENCE_LENGTH
+
+        y_pred = tf.reshape(y_pred, (new_shape, self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS))
+        y_true = tf.reshape(y_true, (new_shape, self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS))
+        tboxes = tf.reshape(tboxes, (new_shape, 1, 1, 1, self.TRUE_BOX_BUFFER , 4))
+
+        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes, message='[TRACKER]')
         return loss
 
     def init_weights(self):
@@ -521,11 +526,11 @@ class MultiObjDetTracker:
         output_det = TimeDistributed(Reshape((self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS)), name='detection')(x_bbox)
 
         z = concatenate([x_bbox, x_vis])
-        z = ConvLSTM2D(1024, (3,3), strides=(1,1), padding='same', return_sequences=True, name='tconv_lstm')(z)
+        z_vis = ConvLSTM2D(1024, (3,3), strides=(1,1), padding='same', return_sequences=True, name='tconv_lstm')(z)
 
-        z = TimeDistributed(Conv2D(1024, (3,3), strides=(1,1), padding='same', use_bias=False, name='tconv_1'), name='timedist_tconv1')(z)
-        z = TimeDistributed(BatchNormalization(name='tnorm_1'), name='timedist_tnorm')(z)
-        z_vis = TimeDistributed(LeakyReLU(alpha=0.1))(z)
+        # z = TimeDistributed(Conv2D(1024, (3,3), strides=(1,1), padding='same', use_bias=False, name='tconv_1'), name='timedist_tconv1')(z)
+        # z = TimeDistributed(BatchNormalization(name='tnorm_1'), name='timedist_tnorm')(z)
+        # z_vis = TimeDistributed(LeakyReLU(alpha=0.1))(z)
 
         z_bbox = TimeDistributed(Conv2D(self.BOX * (4 + 1 + self.CLASS), (1,1), strides=(1,1), padding='same', name='tconv_2'), name='timedist_tconv2')(z_vis)
         z_out = TimeDistributed(Reshape((self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS)))(z_bbox)
@@ -543,8 +548,8 @@ class MultiObjDetTracker:
         train_batch  = None
         valid_batch  = None
 
-        pickle_train = 'data/Train_MultiObjDetTracker_' + self.TRAIN_MODE + '.pickle'
-        pickle_val   = 'data/Val_MultiObjDetTracker_' + self.TRAIN_MODE + '.pickle'
+        pickle_train = 'data/MultiObjDetTracker_TrainAnn' + self.TRAIN_MODE + '.pickle'
+        pickle_val   = 'data/MultiObjDetTracker_ValAnn' + self.TRAIN_MODE + '.pickle'
 
         if os.path.isfile(pickle_train):
             with open (pickle_train, 'rb') as fp:
@@ -565,9 +570,10 @@ class MultiObjDetTracker:
 
 
         if self.TRAIN_MODE=='Tracker':
-            generator_config['BATCH_SIZE'] += generator_config['SEQUENCE_LENGTH'] - 1 # For Internal Use
-            train_batch = BatchSequenceGenerator(train_imgs, generator_config, norm=normalize, shuffle=False, jitter=True)
-            valid_batch = BatchSequenceGenerator(valid_imgs, generator_config, norm=normalize, shuffle=False, jitter=False)
+            print "TRAIN GEN", len(train_imgs), generator_config
+            train_batch = BatchSequenceGenerator(train_imgs, generator_config, norm=normalize)
+            print "VALID GEN", len(valid_imgs), generator_config
+            valid_batch = BatchSequenceGenerator(valid_imgs, generator_config, norm=normalize, jitter=False)
 
         elif self.TRAIN_MODE=='Detector':
             train_batch = BatchGenerator(train_imgs, generator_config, norm=normalize)
@@ -603,7 +609,6 @@ class MultiObjDetTracker:
         }
 
         train_batch, valid_batch = self.load_data_generators(generator_config)
-        print "Generators Print", train_batch, valid_batch
         print "Length of Generators", len(train_batch), len(valid_batch)
 
         early_stop = EarlyStopping(monitor   = 'val_loss',
@@ -626,12 +631,12 @@ class MultiObjDetTracker:
                                   write_graph    = True,
                                   write_images   = False)
 
-        optimizer = Adam(lr=0.5e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        optimizer = Adam(lr=0.1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         #optimizer = SGD(lr=1e-4, decay=0.0005, momentum=0.9)
         #optimizer = RMSprop(lr=1e-4, rho=0.9, epsilon=1e-08, decay=0.0)
 
         if self.TRAIN_MODE=='Tracker':
-            self.model.compile(loss=[self.custom_loss_track, self.custom_loss_track], loss_weights=[0.4, 0.6], optimizer=optimizer)
+            self.model.compile(loss=[self.custom_loss_ttrack, self.custom_loss_dtrack], loss_weights=[0.5, 0.5], optimizer=optimizer)
 
             self.model.fit_generator(
                         generator        = train_batch,
