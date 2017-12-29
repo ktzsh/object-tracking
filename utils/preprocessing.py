@@ -15,8 +15,8 @@ def parse_annotation(ann_dir, img_dir, labels=[]):
 
     # anns = sorted(os.listdir(ann_dir))
     for (dirpath, dirnames, filenames) in os.walk(ann_dir):
-        if len(anns)>=1024:
-            break
+        # if len(anns)>=1024:
+        #     break
         if len(filenames)==0:
             continue
         for filename in sorted(filenames):

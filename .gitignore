@@ -10,6 +10,12 @@ demo.mp4
 *.mp4
 *.caffemodel
 
+*.jpg
+*.pickle
+*.log
+*.logs
+logs/*
+
 # Prerequisites
 *.d
 

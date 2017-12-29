@@ -93,8 +93,6 @@ class MultiObjDetTracker:
 
     def __init__(self, argv=[]):
         self.detector = KerasYOLO()
-        if len(argv)!=0:
-            self.detector.load_weights(argv[0])
         self.load_model()
 
     def loss_fxn(self, y_true, y_pred, tboxes, message=''):
@@ -239,7 +237,7 @@ class MultiObjDetTracker:
         #optimizer = SGD(lr=1e-4, decay=0.0005, momentum=0.9)
         #optimizer = RMSprop(lr=1e-4, rho=0.9, epsilon=1e-08, decay=0.0)
 
-        self.model.compile(loss=[self.custom_loss_ttrack, self.custom_loss_dtrack], loss_weights=[1.0, 1.0], optimizer=optimizer)
+        self.model.compile(loss=[self.custom_loss_ttrack, self.custom_loss_dtrack], loss_weights=[1.5, 1.0], optimizer=optimizer)
         self.model.fit_generator(
                     generator        = train_batch,
                     steps_per_epoch  = len(train_batch),
@@ -254,18 +252,24 @@ class MultiObjDetTracker:
     def load_weights(self, weight_path):
         self.model.load_weights(weight_path)
 
-    # def predict(self, image_path):
-    #     image = cv2.imread(image_path)
-    #     resized_image = cv2.resize(image, (self.IMAGE_H, self.IMAGE_W))
-    #     resized_image = normalize(resized_image)
-    #     input_image = resized_image.reshape((1, self.IMAGE_H, self.IMAGE_W, 3))
-    #
-    #     dummy_array = np.zeros((1,1,1,1,self.MAX_BOX_PER_IMAGE,4))
-    #
-    #     netout = self.model.predict([input_image, dummy_array])[0]
-    #     boxes  = decode_netout(netout, self.OBJ_THRESHOLD, self.NMS_THRESHOLD, self.ANCHORS, len(self.LABELS))
-    #     image = draw_boxes(image, boxes, self.LABELS)
-    #
-    #     print len(boxes), 'Bounding Boxes Found'
-    #     print "File Saved to Output.jpg"
-    #     cv2.imwrite('Output.jpg', image)
+    def predict(self, input_paths, output_paths):
+        assert len(input_paths)==self.SEQUENCE_LENGTH
+
+        x = np.zeros((1, self.SEQUENCE_LENGTH, self.IMAGE_H, self.IMAGE_W, 3))
+        b = np.zeros((1, self.SEQUENCE_LENGTH, 1, 1, 1, 1, self.MAX_BOX_PER_IMAGE, 4))
+        for i,input_path in enumerate(input_paths):
+            image = cv2.imread(image_path)
+            resized_image = cv2.resize(image, (self.IMAGE_H, self.IMAGE_W))
+            resized_image = normalize(resized_image)
+            x[0,i] = resized_image.reshape((1, self.IMAGE_H, self.IMAGE_W, 3))
+            b[0,i] = np.zeros((1, 1, 1, 1, self.MAX_BOX_PER_IMAGE, 4))
+
+        netouts = self.model.predict([x, b])[0]
+
+        for i,netout in enumerate(netouts):
+            boxes  = decode_netout(netout, self.OBJ_THRESHOLD, self.NMS_THRESHOLD, self.ANCHORS, len(self.LABELS))
+            image = draw_boxes(image, boxes, self.LABELS)
+
+            print len(boxes), 'Bounding Boxes Found'
+            print "File Saved to", output_paths[i]
+            cv2.imwrite(output_paths[i], image)

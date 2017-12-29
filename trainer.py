@@ -1,5 +1,6 @@
 import os
 from utils.utils import prepare_data
+from models_detection.KerasYOLO import KerasYOLO
 from models_tracking.TinyTracker import TinyTracker
 from models_tracking.TinyHeatmapTracker import TinyHeatmapTracker
 from models_tracking.MultiObjDetTracker import MultiObjDetTracker
@@ -57,8 +58,11 @@ def single_object_tracking():
 
 if __name__=='__main__':
 
-    model = MultiObjDetTracker(['Tracker'])
-    model.train()
+    # prefix = 'darknet/data/'
+    # inputs = ['dog.jpg', 'eagle.jpg', 'giraffe.jpg', 'horses.jpg', 'person.jpg']
+    # model = KerasYOLO()
+    # for input_instance in inputs:
+    #     model.predict(prefix + input_instance, input_instance)
 
-    # model = MultiObjDetTracker(['Detector'])
-    # model.predict('darknet/data/dog.jpg')
+    model = MultiObjDetTracker()
+    model.train()
