@@ -3,14 +3,14 @@ import tensorflow as tf
 from keras import backend as K
 from keras.layers.normalization import BatchNormalization
 from keras.layers import Activation, Input, LSTM, Dense, Dropout, Conv2D, Flatten, MaxPooling2D, Reshape, GlobalMaxPooling2D
-from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
 from keras.optimizers import SGD, Adam
 from keras.layers.merge import concatenate
 from keras.models import Model, load_model
 from keras.layers.wrappers import TimeDistributed
 from keras.preprocessing.sequence import pad_sequences
 
-
+from models_detection.YOLO import YOLO
 #  --------------------------------------------------------------------------------------------------------------------
 
 class TinyTracker:
@@ -33,13 +33,13 @@ class TinyTracker:
     model_detector     = None
     detection_model    = None
 
-    def __init__(self, argvs):
-        self.argv_parser(argvs)
+    def __init__(self, argv):
+        self.argv_parser(argv)
         self.load_detection_model()
         self.load_tracker_model()
 
 
-    def argv_parser(self, argvs):
+    def argv_parser(self, argv):
         self.detection_model = argv[0]
         self.cpu_mode = argv[1]
         self.tgpu_id = argv[2]
@@ -84,7 +84,7 @@ class TinyTracker:
             x = TimeDistributed(MaxPooling2D((4, 4), strides=(4, 4), name='pool1'))(img_input)
             x = TimeDistributed(Flatten(name='flatten'))(x)
         elif self.pool=='Global':
-            x = TimeDistributed(GlobalMaxPooling2D(name='pool1')(x))
+            x = TimeDistributed(GlobalMaxPooling2D(name='pool1'))(img_input)
         x = TimeDistributed(Dense(self.INPUT_FEAT, activation='relu', name='fc1'))(x)
 
         x = concatenate([x, det_input])
@@ -92,14 +92,14 @@ class TinyTracker:
         x = LSTM(self.LSTM_UNITS, return_sequences=True, implementation=2, name='recurrent_layer')(x)
         output = TimeDistributed(Dense(4, activation='sigmoid', name='output'))(x)
 
-        model = Model(inputs=x_input, outputs=output)
+        model = Model(inputs=[img_input, det_input], outputs=output)
         optimizer = Adam(lr=0.01, decay=0.0)
         model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
         self.model_tracker = model
         model.summary()
 
 
-    def get_batch(self, frame_dim_dirs, frame_paths_dirs, frame_bboxs_dirs):
+    def get_batch(self, frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs):
         idx = 0
         x_img = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, self._w, self._h, self._c), dtype='float32')
         x_bbox = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, 4), dtype='float32')
@@ -134,8 +134,8 @@ class TinyTracker:
 
 
     def train(self, train_data_dirs, val_data_dirs):
-        t_frame_dim_dirs, t_frame_paths_dirs, t_frame_bboxs_dirs = train_data_dirs
-        v_frame_dim_dirs, v_frame_paths_dirs, v_frame_bboxs_dirs = val_data_dirs
+        t_frame_paths_dirs, t_frame_bboxs_dirs, t_frame_dim_dirs = train_data_dirs
+        v_frame_paths_dirs, v_frame_bboxs_dirs, v_frame_dim_dirs = val_data_dirs
 
         t_data_size = sum( len(t) - self.SEQUENCE_LENGTH + 1 for t in t_frame_paths_dirs)
         v_data_size = sum( len(v) - self.SEQUENCE_LENGTH + 1 for v in v_frame_paths_dirs)
@@ -169,7 +169,7 @@ class TinyTracker:
         csv_logger = CSVLogger('logs/TinyTracker_' + self.detection_model + '.log', append=False)
 
         self.model_tracker.fit_generator(
-                            self.get_batch(t_frame_dim_dirs, t_frame_paths_dirs, t_frame_bboxs_dirs),
+                            self.get_batch(t_frame_paths_dirs, t_frame_bboxs_dirs, t_frame_dim_dirs),
                             steps_per_epoch=t_data_size//self.batch_size,
                             epochs=self.max_epochs,
                             callbacks=[earlystopper, model_checkpointer, weights_checkpointer, csv_logger, reduce_lr_loss],

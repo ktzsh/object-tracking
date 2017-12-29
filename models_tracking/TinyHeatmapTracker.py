@@ -3,14 +3,14 @@ import tensorflow as tf
 from keras import backend as K
 from keras.layers.normalization import BatchNormalization
 from keras.layers import Activation, Input, LSTM, Dense, Dropout, Conv2D, Flatten, MaxPooling2D, Reshape, GlobalMaxPooling2D
-from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
 from keras.optimizers import SGD, Adam
 from keras.layers.merge import concatenate
 from keras.models import Model, load_model
 from keras.layers.wrappers import TimeDistributed
 from keras.preprocessing.sequence import pad_sequences
 
-
+from models_detection.YOLO import YOLO
 #  --------------------------------------------------------------------------------------------------------------------
 
 class TinyHeatmapTracker:
@@ -33,13 +33,13 @@ class TinyHeatmapTracker:
     model_detector     = None
     detection_model    = None
 
-    def __init__(self, argvs):
-        self.argv_parser(argvs)
+    def __init__(self, argv):
+        self.argv_parser(argv)
         self.load_detection_model()
         self.load_tracker_model()
 
 
-    def argv_parser(self, argvs):
+    def argv_parser(self, argv):
         self.detection_model = argv[0]
         self.cpu_mode = argv[1]
         self.tgpu_id = argv[2]
@@ -84,7 +84,7 @@ class TinyHeatmapTracker:
             x = TimeDistributed(MaxPooling2D((4, 4), strides=(4, 4), name='pool1'))(img_input)
             x = TimeDistributed(Flatten(name='flatten'))(x)
         elif self.pool=='Global':
-            x = TimeDistributed(GlobalMaxPooling2D(name='pool1')(x))
+            x = TimeDistributed(GlobalMaxPooling2D(name='pool1'))(img_input)
         x = TimeDistributed(Dense(self.INPUT_FEAT, activation='relu', name='fc1'))(x)
 
         x = concatenate([x, det_input])
@@ -92,7 +92,7 @@ class TinyHeatmapTracker:
         x = LSTM(self.LSTM_UNITS, return_sequences=True, implementation=2, name='recurrent_layer')(x)
         output = TimeDistributed(Dense(self.HEATMAP_SIZE, activation='sigmoid', name='output'))(x)
 
-        model = Model(inputs=x_input, outputs=output)
+        model = Model(inputs=[img_input, det_input], outputs=output)
         optimizer = Adam(lr=0.01, decay=0.0)
         model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
         self.model_tracker = model

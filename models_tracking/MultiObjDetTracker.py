@@ -106,7 +106,7 @@ class MultiObjDetTracker:
         y_true = tf.reshape(y_true, (new_shape, self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS))
         tboxes = tf.reshape(tboxes, (new_shape, 1, 1, 1, self.TRUE_BOX_BUFFER , 4))
 
-        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes, message='[DETECTOR] ')
+        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes, message='DETECTOR: ')
         return loss
 
     def custom_loss_ttrack(self, y_true, y_pred):
@@ -117,7 +117,7 @@ class MultiObjDetTracker:
         y_true = tf.reshape(y_true, (new_shape, self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS))
         tboxes = tf.reshape(tboxes, (new_shape, 1, 1, 1, self.TRUE_BOX_BUFFER , 4))
 
-        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes, message='[TRACKER] ')
+        loss = self.loss_fxn(y_true, y_pred, tboxes=tboxes, message='TRACKER: ')
         return loss
 
     def load_model(self):
@@ -143,7 +143,7 @@ class MultiObjDetTracker:
         # z = TimeDistributed(BatchNormalization(name='tnorm_1'), name='timedist_tnorm')(z)
         # z_vis = TimeDistributed(LeakyReLU(alpha=0.1))(z)
 
-        z_bbox = TimeDistributed(Conv2D(self.BOX * (4 + 1 + self.CLASS), (1,1), strides=(1,1), padding='same', name='tconv_2'), name='timedist_tconv2')(z_vis)
+        z_bbox = TimeDistributed(Conv2D(self.BOX * (4 + 1 + self.CLASS), (1,1), strides=(1,1), padding='same', kernel_initializer='lecun_normal', name='tconv_2'), name='timedist_tconv2')(z_vis)
         z_out = TimeDistributed(Reshape((self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS)))(z_bbox)
 
         self.true_boxes = Input(batch_shape=(self.BATCH_SIZE, self.SEQUENCE_LENGTH, 1, 1, 1, self.TRUE_BOX_BUFFER , 4), name='bbox_input')

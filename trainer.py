@@ -16,8 +16,8 @@ def single_object_tracking():
                 ]
 
     val_data_dirs = [
-                        'Human3',  'Human8',  'Jogging-2',  'Skater',     'Girl2',
-                        'Dancer',  'Car1',    'Car24',      'Skating2-1'
+                        'Human3',  'Human8',  'Jogging-2',  'Skater',     #'Girl2',
+                        'Car1',    'Car24',   'Skating2-1', #'Dancer'  
                     ]
 
     _CONFIG = {
@@ -43,7 +43,7 @@ def single_object_tracking():
 
     if _CONFIG['_CPU_ONLY']==0:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(_CONFIG[_TRACKER_GPUID])
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(_CONFIG['_TRACKER_GPUID'])
 
     if _CONFIG['_TRACKER']=='TinyTracker':
         tracker = TinyTracker(config)
@@ -56,13 +56,22 @@ def single_object_tracking():
 
     tracker.train(train_data, val_data)
 
-if __name__=='__main__':
-
-    # prefix = 'darknet/data/'
-    # inputs = ['dog.jpg', 'eagle.jpg', 'giraffe.jpg', 'horses.jpg', 'person.jpg']
-    # model = KerasYOLO()
-    # for input_instance in inputs:
-    #     model.predict(prefix + input_instance, input_instance)
-
+def simult_multi_obj_detection_tracking():
     model = MultiObjDetTracker()
     model.train()
+
+def keras_yolo_obj_detection():
+    model = KerasYOLO()
+    model.train()
+
+    prefix = 'darknet/data/'
+    inputs = ['dog.jpg', 'eagle.jpg', 'giraffe.jpg', 'horses.jpg', 'person.jpg']
+    model = KerasYOLO()
+    for input_instance in inputs:
+        model.predict(prefix + input_instance, input_instance)
+
+if __name__=='__main__':
+
+    single_object_tracking()
+    # keras_yolo_obj_detection()
+    # simult_multi_obj_detection_tracking()

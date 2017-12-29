@@ -103,7 +103,7 @@ class YOLO:
             self.net = load_net(self.CONFIG, self.WEIGHTS, 0)
         else:
             self.net = load_net_gpu(self.CONFIG, self.WEIGHTS, 0, self.gpu_id)
-        self.meta = load_meta(self.WEIGHTS)
+        self.meta = load_meta(self.META)
         os.chdir('../')
 
     def get_layer_dims(self, n):
@@ -135,8 +135,8 @@ class YOLO:
 
     def extract_spatio_info(self, frame_path, layer=24):
         obj_detections = []
-        out = detect(self.net, self.meta, frame_path)
-        vis_feat = extract(layer)
+        out = self.detect(frame_path)
+        vis_feat = self.extract(layer)
 
         for detection in out:
             if detection[0] in self.CLASSES:
