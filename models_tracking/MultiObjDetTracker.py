@@ -2,8 +2,8 @@ import pickle
 import os, cv2
 import numpy as np
 from models_detection.KerasYOLO import KerasYOLO
-from utils.preprocessing import parse_annotation, BatchSequenceGenerator
-from utils.utils import WeightReader, decode_netout, draw_boxes, normalize
+from utility.preprocessing import parse_annotation, BatchSequenceGenerator
+from utility.utils import WeightReader, decode_netout, draw_boxes, normalize
 
 import tensorflow as tf
 import keras.backend as K
@@ -50,6 +50,21 @@ IMAGENET_LABEL_MAP = {
                         'n02391049' : 'zebra'
                     }
 
+MOT17_LABEL_MAP =   {
+                        '1'  : 'Pedestrian',
+                        '2'  : 'Person on vehicle',
+                        '3'  : 'Car',
+                        '4'  : 'Bicycle',
+                        '5'  : 'Motorbike',
+                        '6'  : 'Non motorized vehicle',
+                        '7'  : 'Static person',
+                        '8'  : 'Distractor',
+                        '9'  : 'Occluder',
+                        '10' : 'Occluder on the ground',
+                        '11' : 'Occluder full',
+                        '12' : 'Reflection'
+                    }
+
 class MultiObjDetTracker:
 
     LABELS_IMAGENET_VIDEO = [
@@ -60,9 +75,13 @@ class MultiObjDetTracker:
                                 'n02129604', 'n04468005', 'n01662784', 'n04530566', 'n02062744', 'n02391049'
                             ]
 
-    LABELS           = LABELS_IMAGENET_VIDEO
-    IMAGE_H, IMAGE_W = 416, 416
-    GRID_H,  GRID_W  = 13 , 13
+    LABELS_MOT17 =  [
+                        '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'
+                    ]
+
+    LABELS           = LABELS_MOT17
+    IMAGE_H, IMAGE_W = 608, 608
+    GRID_H,  GRID_W  = 19 , 19
     BOX              = 5
     CLASS            = len(LABELS)
     CLASS_WEIGHTS    = np.ones(CLASS, dtype='float32')
@@ -82,17 +101,29 @@ class MultiObjDetTracker:
     SEQUENCE_LENGTH   = 4
     MAX_BOX_PER_IMAGE = 50
 
-    train_image_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Data/VID/train/'
-    train_annot_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Annotations/VID/train/'
-    valid_image_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Data/VID/val/'
-    valid_annot_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Annotations/VID/val/'
+    # train_image_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Data/VID/train/'
+    # train_annot_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Annotations/VID/train/'
+    # valid_image_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Data/VID/val/'
+    # valid_annot_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Annotations/VID/val/'
+
+    train_image_folder = 'data/MOT17/MOT17Det/train/'
+    train_annot_folder = 'data/MOT17Ann/train/'
+    valid_image_folder = 'data/MOT17/MOT17Det/train/'
+    valid_annot_folder = 'data/MOT17Ann/val/'
 
     model          = None
     detector       = None
     model_detector = None
 
-    def __init__(self, argv=[]):
-        self.detector = KerasYOLO()
+    def __init__(self, argv={}):
+        argv['LABELS']        = self.LABELS
+        argv['BATCH_SIZE']    = self.BATCH_SIZE
+        argv['IMAGE_H']       = self.IMAGE_H
+        argv['IMAGE_W']       = self.IMAGE_W
+        argv['GRID_H']        = self.GRID_H
+        argv['GRID_W']        = self.GRID_W
+
+        self.detector = KerasYOLO(argv)
         self.load_model()
 
     def loss_fxn(self, y_true, y_pred, tboxes, message=''):
@@ -125,7 +156,6 @@ class MultiObjDetTracker:
         self.model_detector = Model( inputs=self.detector.model.input[0],
                                      outputs=[ self.detector.model.get_layer('conv_23').output,
                                                self.detector.model.get_layer('conv_feat').output])
-        self.model_detector.summary()
 
         input_images = Input(batch_shape=(self.BATCH_SIZE, self.SEQUENCE_LENGTH, self.IMAGE_H, self.IMAGE_W, 3), name='images_input')
 
@@ -159,8 +189,10 @@ class MultiObjDetTracker:
         train_batch  = None
         valid_batch  = None
 
-        pickle_train = 'data/MultiObjDetTracker_TrainAnn.pickle'
-        pickle_val   = 'data/MultiObjDetTracker_ValAnn.pickle'
+        # pickle_train = 'data/MultiObjDetTracker_TrainAnn.pickle'
+        # pickle_val   = 'data/MultiObjDetTracker_ValAnn.pickle'
+        pickle_train = 'data/MultiObjDetTracker_MOT17_TrainAnn.pickle'
+        pickle_val   = 'data/MultiObjDetTracker_MOT17_ValAnn.pickle'
 
         if os.path.isfile(pickle_train):
             with open (pickle_train, 'rb') as fp:
@@ -181,9 +213,9 @@ class MultiObjDetTracker:
 
 
         print "TRAIN GEN", len(train_imgs), generator_config
-        train_batch = BatchSequenceGenerator(train_imgs, generator_config, norm=normalize, shuffle=True, jitter=False)
+        train_batch = BatchSequenceGenerator(train_imgs, generator_config, norm=normalize, shuffle=True, augment=False)
         print "VALID GEN", len(valid_imgs), generator_config
-        valid_batch = BatchSequenceGenerator(valid_imgs, generator_config, norm=normalize, jitter=False)
+        valid_batch = BatchSequenceGenerator(valid_imgs, generator_config, norm=normalize, augment=False)
 
         return train_batch, valid_batch
 

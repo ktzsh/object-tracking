@@ -1,8 +1,8 @@
 import pickle
 import os, cv2
 import numpy as np
-from utils.preprocessing import parse_annotation, BatchGenerator
-from utils.utils import WeightReader, decode_netout, draw_boxes, normalize
+from utility.preprocessing import parse_annotation, BatchGenerator
+from utility.utils import WeightReader, decode_netout, draw_boxes, normalize
 
 import tensorflow as tf
 import keras.backend as K
@@ -34,15 +34,7 @@ class KerasYOLO:
                 'hair drier',    'toothbrush'
             ]
 
-    LABELS_IMAGENET_VIDEO = [
-                                'n02691156', 'n02419796', 'n02131653', 'n02834778', 'n01503061', 'n02924116',
-                                'n02958343', 'n02402425', 'n02084071', 'n02121808', 'n02503517', 'n02118333',
-                                'n02510455', 'n02342885', 'n02374451', 'n02129165', 'n01674464', 'n02484322',
-                                'n03790512', 'n02324045', 'n02509815', 'n02411705', 'n01726692', 'n02355227',
-                                'n02129604', 'n04468005', 'n01662784', 'n04530566', 'n02062744', 'n02391049'
-                            ]
-
-    LABELS           = LABELS_IMAGENET_VIDEO
+    LABELS           = LABELS_COCO
     IMAGE_H, IMAGE_W = 416, 416
     GRID_H,  GRID_W  = 13 , 13
     BOX              = 5
@@ -72,7 +64,18 @@ class KerasYOLO:
 
     model = None
 
-    def __init__(self, argv=None):
+    def __init__(self, argv={}):
+
+        if len(argv)==6:
+            self.LABELS           = argv['LABELS']
+            self.CLASS            = len(self.LABELS)
+            self.CLASS_WEIGHTS    = np.ones(self.CLASS, dtype='float32')
+            self.BATCH_SIZE       = argv['BATCH_SIZE']
+            self.IMAGE_H          = argv['IMAGE_H']
+            self.IMAGE_W          = argv['IMAGE_W']
+            self.GRID_H           = argv['GRID_H']
+            self.GRID_W           = argv['GRID_W']
+
         self.load_model()
 
     def loss_fxn(self, y_true, y_pred, tboxes, message=''):

@@ -5,7 +5,7 @@ import copy
 import cv2
 
 def prepare_data(data_dirs):
-    path_prefix = './data/TB-50/'
+    path_prefix = '/root/Data/TB-50/'
     frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs = [], [], []
     print "All Directories List:", data_dirs
 
@@ -43,7 +43,6 @@ def prepare_data(data_dirs):
                 frame_paths.append(frame_path)
 
         print "Number of samples:", len(frame_paths)
-        print "Done.."
         frame_paths_dirs.append(frame_paths)
         frame_bboxs_dirs.append(frame_bboxs)
         frame_dim_dirs.append([frame_height, frame_width, frame_channel])

@@ -11,6 +11,7 @@ from keras.layers.wrappers import TimeDistributed
 from keras.preprocessing.sequence import pad_sequences
 
 from models_detection.YOLO import YOLO
+from models_detection.FasterRCNN import FasterRCNN
 #  --------------------------------------------------------------------------------------------------------------------
 
 class TinyHeatmapTracker:

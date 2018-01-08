@@ -7,8 +7,9 @@ def add_path(path):
 
 this_dir = os.path.dirname(__file__)
 caffe_path = os.path.join(this_dir, '..', 'py-faster-rcnn', 'caffe-fast-rcnn', 'python')
-lib_path = osp.join(this_dir, '..', 'py-faster-rcnn', 'lib')
 add_path(caffe_path)
+
+lib_path = os.path.join(this_dir, '..', 'py-faster-rcnn', 'lib')
 add_path(lib_path)
 
 from fast_rcnn.config import cfg
@@ -25,7 +26,7 @@ class FasterRCNN:
     cpu_mode    = 0
     NMS_THRESH  = 0.3
     CONF_THRESH = 0.8
-    
+
     CLASSES = ('__background__',
                'aeroplane', 'bicycle', 'bird', 'boat',
                'bottle', 'bus', 'car', 'cat', 'chair',

@@ -1,6 +1,8 @@
 import os
-from utils.utils import prepare_data
+from utility.utils import prepare_data
 from models_detection.KerasYOLO import KerasYOLO
+from models_detection.FasterRCNN import FasterRCNN
+from models_detection.YOLO import YOLO
 from models_tracking.TinyTracker import TinyTracker
 from models_tracking.TinyHeatmapTracker import TinyHeatmapTracker
 from models_tracking.MultiObjDetTracker import MultiObjDetTracker
@@ -17,13 +19,13 @@ def single_object_tracking():
 
     val_data_dirs = [
                         'Human3',  'Human8',  'Jogging-2',  'Skater',     #'Girl2',
-                        'Car1',    'Car24',   'Skating2-1', #'Dancer'  
+                        'Car1',    'Car24',   'Skating2-1', #'Dancer'
                     ]
 
     _CONFIG = {
                 '_TRACKER'       : 'TinyTracker', #TinyHeatmapTracker
-                '_DETECTOR'      : 'YOLO', #FasterRCNN
-                '_CPU_ONLY'      : 0,
+                '_DETECTOR'      : 'FasterRCNN', #FasterRCNN
+                '_CPU_ONLY'      : 1,
                 '_TRACKER_GPUID' : 0,
                 '_DETECTOR_GPUID': 1,
                 '_POOL'          : 'Global', #Max
@@ -50,7 +52,6 @@ def single_object_tracking():
     elif _CONFIG['_DETECTOR']=='TinyHeatmapTracker':
         tracker = TinyHeatmapTracker(config)
 
-
     train_data = prepare_data(train_data_dirs)
     val_data = prepare_data(val_data_dirs)
 
@@ -72,6 +73,6 @@ def keras_yolo_obj_detection():
 
 if __name__=='__main__':
 
-    single_object_tracking()
+    # single_object_tracking()
     # keras_yolo_obj_detection()
-    # simult_multi_obj_detection_tracking()
+    simult_multi_obj_detection_tracking()

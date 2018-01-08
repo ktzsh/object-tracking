@@ -15,8 +15,8 @@ def parse_annotation(ann_dir, img_dir, labels=[]):
 
     # anns = sorted(os.listdir(ann_dir))
     for (dirpath, dirnames, filenames) in os.walk(ann_dir):
-        if len(anns)>=256:
-            break
+        # if len(anns)>=256:
+        #     break
         if len(filenames)==0:
             continue
         for filename in sorted(filenames):
@@ -91,7 +91,7 @@ class BatchGenerator(Sequence):
     def __init__(self, images,
                        config,
                        shuffle=True,
-                       jitter=True,
+                       augment=True,
                        norm=None):
         self.generator = None
 
@@ -99,13 +99,12 @@ class BatchGenerator(Sequence):
         self.config = config
 
         self.shuffle = shuffle
-        self.jitter  = jitter
+        self.augment  = augment
         self.norm    = norm
 
         self.counter = 0
         self.anchors = [BoundBox(0, 0, config['ANCHORS'][2*i], config['ANCHORS'][2*i+1]) for i in range(int(len(config['ANCHORS'])//2))]
 
-        ### augmentors by https://github.com/aleju/imgaug
         sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
         # Define our sequence of augmentation steps that will be applied to every image
@@ -116,20 +115,13 @@ class BatchGenerator(Sequence):
             [
                 sometimes(iaa.Affine(
                 )),
-                iaa.SomeOf((0, 5),
+                iaa.SomeOf((0, 4),
                     [
-                        iaa.OneOf([
-                            iaa.GaussianBlur((0, 3.0)), # blur images with a sigma between 0 and 3.0
-                            iaa.AverageBlur(k=(2, 7)), # blur image using local means with kernel sizes between 2 and 7
-                            iaa.MedianBlur(k=(3, 11)), # blur image using local medians with kernel sizes between 2 and 7
-                        ]),
-                        iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.5)), # sharpen images
+                        iaa.GaussianBlur((0, 2.0)), # blur images with a sigma between 0 and 2.0
                         iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5), # add gaussian noise to images
-                        iaa.OneOf([
-                            iaa.Dropout((0.01, 0.1), per_channel=0.5), # randomly remove up to 10% of the pixels
-                        ]),
+                        iaa.Dropout((0.01, 0.1), per_channel=0.5), # randomly remove up to 10% of the pixels
                         iaa.Add((-10, 10), per_channel=0.5), # change brightness of images (by -10 to 10 of original value)
-                        iaa.Multiply((0.5, 1.5), per_channel=0.5), # change brightness of images (50-150% of original value)
+                        iaa.Multiply((0.8, 1.2), per_channel=0.5),
                         iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5), # improve or worsen the contrast
                     ],
                     random_order=True
@@ -143,14 +135,14 @@ class BatchGenerator(Sequence):
     def __len__(self):
         return int(np.ceil(float(len(self.images))/self.config['BATCH_SIZE']))
 
-    def aug_image(self, train_instance, jitter):
+    def aug_image(self, train_instance, augment):
         image_name = train_instance['filename']
         image = cv2.imread(image_name)
         h, w, c = image.shape
 
         all_objs = copy.deepcopy(train_instance['object'])
 
-        if jitter:
+        if augment:
             ### scale the image
             scale = np.random.uniform() / 10. + 1.
             image = cv2.resize(image, (0,0), fx = scale, fy = scale)
@@ -176,36 +168,37 @@ class BatchGenerator(Sequence):
         # fix object's position and size
         for obj in all_objs:
             for attr in ['xmin', 'xmax']:
-                if jitter: obj[attr] = int(obj[attr] * scale - offx)
+                if augment: obj[attr] = int(obj[attr] * scale - offx)
 
                 obj[attr] = int(obj[attr] * float(self.config['IMAGE_W']) / w)
                 obj[attr] = max(min(obj[attr], self.config['IMAGE_W']), 0)
 
             for attr in ['ymin', 'ymax']:
-                if jitter: obj[attr] = int(obj[attr] * scale - offy)
+                if augment: obj[attr] = int(obj[attr] * scale - offy)
 
                 obj[attr] = int(obj[attr] * float(self.config['IMAGE_H']) / h)
                 obj[attr] = max(min(obj[attr], self.config['IMAGE_H']), 0)
 
-            if jitter and flip > 0.5:
+            if augment and flip > 0.5:
                 xmin = obj['xmin']
                 obj['xmin'] = self.config['IMAGE_W'] - obj['xmax']
                 obj['xmax'] = self.config['IMAGE_W'] - xmin
 
         return image, all_objs
 
-    def output_from_instance(self, train_instance):
+    def output_from_instance(self, train_instance, idx, debug=True):
         x_instance = np.zeros((self.config['IMAGE_H'], self.config['IMAGE_W'], 3))
         b_instance = np.zeros((1     , 1     , 1    ,  self.config['TRUE_BOX_BUFFER'], 4))
         y_instance = np.zeros((self.config['GRID_H'],  self.config['GRID_W'], self.config['BOX'], 4+1+self.config['CLASS']))
 
         # augment input image and fix object's position and size
-        img, all_objs = self.aug_image(train_instance, jitter=self.jitter)
+        img, all_objs = self.aug_image(train_instance, augment=self.augment)
 
         # construct output from object's x, y, w, h
         true_box_index = 0
 
         for obj in all_objs:
+
             if obj['xmax'] > obj['xmin'] and obj['ymax'] > obj['ymin'] and obj['name'] in self.config['LABELS']:
                 center_x = .5*(obj['xmin'] + obj['xmax'])
                 center_x = center_x / (float(self.config['IMAGE_W']) / self.config['GRID_W'])
@@ -251,10 +244,7 @@ class BatchGenerator(Sequence):
                     true_box_index += 1
                     true_box_index = true_box_index % self.config['TRUE_BOX_BUFFER']
 
-        # assign input image to x
-        if self.norm != None:
-            x_instance = self.norm(img)
-        else:
+        if debug:
             # plot image and bounding boxes for sanity check
             for obj in all_objs:
                 if obj['xmax'] > obj['xmin'] and obj['ymax'] > obj['ymin']:
@@ -264,7 +254,15 @@ class BatchGenerator(Sequence):
                                 0, 1.2e-3 * img.shape[0],
                                 (0,255,0), 2)
 
-            x_instance = img
+            if not os.path.isdir('data/debug/' + str(idx)):
+                os.makedirs('data/debug/' + str(idx))
+            file_path = 'data/debug/' + str(idx) + '/' + train_instance['filename'].split('/')[-1]
+            cv2.imwrite(file_path, img)
+
+        # assign input image to x
+        if self.norm != None:
+            x_instance = self.norm(img)
+
         return [x_instance, b_instance], y_instance
 
     def __getitem__(self, idx):
@@ -286,7 +284,7 @@ class BatchGenerator(Sequence):
         y_batch = np.zeros((r_bound - l_bound, self.config['GRID_H'],  self.config['GRID_W'], self.config['BOX'], 4+1+self.config['CLASS']))
 
         for train_instance in self.images[l_bound:r_bound]:
-            [x_instance, b_instance], y_batch = self.output_from_instance(train_instance)
+            [x_instance, b_instance], y_batch = self.output_from_instance(train_instance, idx)
 
             x_batch[instance_count] = x_instance
             b_batch[instance_count] = b_instance
@@ -305,7 +303,7 @@ class BatchSequenceGenerator(BatchGenerator):
     def __init__(self, images,
                        config,
                        shuffle=True,
-                       jitter=True,
+                       augment=True,
                        norm=None):
 
         self.seed  = 1
@@ -314,16 +312,16 @@ class BatchSequenceGenerator(BatchGenerator):
         super(BatchSequenceGenerator, self).__init__(  images_seq,
                                                        config,
                                                        shuffle=shuffle,
-                                                       jitter=jitter,
+                                                       augment=augment,
                                                        norm=norm)
 
     def __len__(self):
         return super(BatchSequenceGenerator, self).__len__()
 
-    def aug_image(self, train_instance, jitter):
+    def aug_image(self, train_instance, augment):
         # apply same augmentation to all images in batch
         np.random.seed(self.seed)
-        return super(BatchSequenceGenerator, self).aug_image(train_instance, jitter)
+        return super(BatchSequenceGenerator, self).aug_image(train_instance, augment)
 
     def __getitem__(self, idx):
         l_bound = idx*self.config['BATCH_SIZE']
@@ -343,7 +341,7 @@ class BatchSequenceGenerator(BatchGenerator):
             self.seed = np.random.randint(low=0, high=10000) + idx
 
             for j, train_instance in enumerate(train_seq):
-                [x_instance, b_instance], y_instance = super(BatchSequenceGenerator, self).output_from_instance(train_instance)
+                [x_instance, b_instance], y_instance = super(BatchSequenceGenerator, self).output_from_instance(train_instance, idx)
 
                 x_batch[i,j,:,:,:]     = x_instance
                 b_batch[i,j,:,:,:,:,:] = b_instance

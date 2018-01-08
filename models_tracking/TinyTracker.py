@@ -11,6 +11,7 @@ from keras.layers.wrappers import TimeDistributed
 from keras.preprocessing.sequence import pad_sequences
 
 from models_detection.YOLO import YOLO
+from models_detection.FasterRCNN import FasterRCNN
 #  --------------------------------------------------------------------------------------------------------------------
 
 class TinyTracker:
@@ -56,6 +57,9 @@ class TinyTracker:
 
     def load_detection_model(self):
         if self.detection_model=='YOLO':
+            # obj = YOLO([1,0])
+            # print "hey", obj
+            # print obj.load_image('/root/Data/TB-50/Human2/img/0001.jpg', 0, 0)
             self.model_detector = YOLO([self.cpu_mode, self.dgpu_id]) #load detection nework on other gpu
             self.INPUT_FEAT = 2048
             self.LSTM_UNITS = 512
@@ -99,7 +103,7 @@ class TinyTracker:
         model.summary()
 
 
-    def get_batch(self, frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs):
+    def get_batch(self, obj, frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs):
         idx = 0
         x_img = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, self._w, self._h, self._c), dtype='float32')
         x_bbox = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, 4), dtype='float32')
