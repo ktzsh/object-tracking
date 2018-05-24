@@ -80,8 +80,8 @@ class MultiObjDetTracker:
                     ]
 
     LABELS           = LABELS_MOT17
-    IMAGE_H, IMAGE_W = 608, 608
-    GRID_H,  GRID_W  = 19 , 19
+    IMAGE_H, IMAGE_W = 608, 608 # 416
+    GRID_H,  GRID_W  = 19 , 19  # 13
     BOX              = 5
     CLASS            = len(LABELS)
     CLASS_WEIGHTS    = np.ones(CLASS, dtype='float32')

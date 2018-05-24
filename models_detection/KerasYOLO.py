@@ -56,7 +56,7 @@ class KerasYOLO:
     MAX_BOX_PER_IMAGE = 50
 
 
-    weight_path = 'darknet/yolo.weights'
+    weight_path = 'darknet/yolov2.weights'
     train_image_folder = 'data/coco/train2014/'
     train_annot_folder = 'data/coco/train2014ann/'
     valid_image_folder = 'data/coco/val2014/'

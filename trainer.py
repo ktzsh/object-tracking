@@ -1,35 +1,34 @@
 import os
 from utility.utils import prepare_data
 from models_detection.KerasYOLO import KerasYOLO
-from models_detection.FasterRCNN import FasterRCNN
-from models_detection.YOLO import YOLO
 from models_tracking.TinyTracker import TinyTracker
 from models_tracking.TinyHeatmapTracker import TinyHeatmapTracker
 from models_tracking.MultiObjDetTracker import MultiObjDetTracker
 
 def single_object_tracking():
     train_data_dirs = [
-                    'Human2',     'Human4',   'Human5',     'Human6',   'Human7',
+                    'Human2',     'Human3',   'Human5',     'Human6',   'Human7',
                     'Human9',     'Woman',    'Jogging-1',  'Walking',  'Walking2',
                     'Subway',     'Singer1',  'Walking2',   'Jump',     'Biker',
-                    'BlurBody',   'Car2',     'Car4',       'CarDark',  'CarScale',
+                    'BlurBody',   'Car2',     'Car24',       'CarDark',  'CarScale',
                     'Suv',        'David3',   'Dancer2',    'Gym',      'Basketball',
                     'Skating2-2'
                 ]
 
     val_data_dirs = [
-                        'Human3',  'Human8',  'Jogging-2',  'Skater',     #'Girl2',
-                        'Car1',    'Car24',   'Skating2-1', #'Dancer'
+                        'Human4',  'Human8',  'Jogging-2',  'Skater',     #'Girl2',
+                        'Car1',    'Car4',   'Skating2-1', #'Dancer'
                     ]
 
     _CONFIG = {
                 '_TRACKER'       : 'TinyTracker', #TinyHeatmapTracker
-                '_DETECTOR'      : 'FasterRCNN', #FasterRCNN
+                '_DETECTOR'      : 'YOLO', #(FasterRCNN, relu5_3) (YOLO, 80)
+                '_DET_FV_LAYER'  : 29,
                 '_CPU_ONLY'      : 1,
                 '_TRACKER_GPUID' : 0,
                 '_DETECTOR_GPUID': 1,
-                '_POOL'          : 'Global', #Max
-                '_BATCH_SIZE'    : 32,
+                '_POOL'          : 'Global', #(Max, Global, None)
+                '_BATCH_SIZE'    : 1,
                 '_MAX_EPOCHS'    : 50
     }
 
@@ -40,7 +39,8 @@ def single_object_tracking():
                 _CONFIG['_DETECTOR_GPUID'],
                 _CONFIG['_POOL'],
                 _CONFIG['_BATCH_SIZE'],
-                _CONFIG['_MAX_EPOCHS']
+                _CONFIG['_MAX_EPOCHS'],
+                _CONFIG['_DET_FV_LAYER']
             ]
 
     if _CONFIG['_CPU_ONLY']==0:
@@ -73,6 +73,8 @@ def keras_yolo_obj_detection():
 
 if __name__=='__main__':
 
+    if not os.path.exists('logs'):
+        os.mkdir('logs/')
+
     # single_object_tracking()
-    # keras_yolo_obj_detection()
     simult_multi_obj_detection_tracking()
