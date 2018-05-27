@@ -1,86 +1,9 @@
 # http://cvlab.hanyang.ac.kr/tracker_benchmark/datasets.html
-# labels manually decided
-LABELS =    [
-                'Person', 'Face', 'Bird', 'Car', 'Deer', 'Dog', 'Bike', 'Panda'
-            ]
-#
-# tb data dirs map
-LABELS_DIR_MAP =    {
-                        'Basketball'   : 'Person',
-                        'Biker'        : 'Face',
-                        'Bird1'        : 'Bird',
-                        'Bird2'        : 'Bird',
-                        'BlurBody'     : 'Person',
-                        'BlurCar1'     : 'Car',
-                        'BlurCar2'     : 'Car',
-                        'BlurCar3'     : 'Car',
-                        'BlurCar4'     : 'Car',
-                        'BlurFace'     : 'Face',
-                        'Bolt'         : 'Person',
-                        'Bolt2'        : 'Person',
-                        'Boy'          : 'Face',
-                        'Car1'         : 'Car',
-                        'Car2'         : 'Car',
-                        'Car24'        : 'Car',
-                        'Car4'         : 'Car',
-                        'CarDark'      : 'Car',
-                        'CarScale'     : 'Car',
-                        'Couple'       : 'Person',
-                        'Crossing'     : 'Person',
-                        'Crowds'       : 'Person',
-                        'Dancer2'      : 'Person',
-                        'David'        : 'Face',
-                        'David2'       : 'Face',
-                        'David3'       : 'Person',
-                        'Deer'         : 'Deer',
-                        'Dog'          : 'Dog',
-                        'Dudek'        : 'Face',
-                        'FaceOcc1'     : 'Face',
-                        'FaceOcc2'     : 'Face',
-                        'FleetFace'    : 'Face',
-                        'Football'     : 'Face',
-                        'Freeman1'     : 'Face',
-                        'Freeman4'     : 'Face',
-                        'Girl'         : 'Face',
-                        'Girl2'        : 'Person',
-                        'Gym'          : 'Person',
-                        'Human2'       : 'Person',
-                        'Human3'       : 'Person',
-                        'Human4'       : 'Person',
-                        'Human5'       : 'Person',
-                        'Human6'       : 'Person',
-                        'Human7'       : 'Person',
-                        'Human8'       : 'Person',
-                        'Human9'       : 'Person',
-                        'Jogging'      : 'Person',
-                        'Jump'         : 'Person',
-                        'Jumping'      : 'Face',
-                        'KiteSurf'     : 'Face',
-                        'Man'          : 'Face',
-                        'Matrix'       : 'Face',
-                        'Mhyang'       : 'Face',
-                        'MotorRolling' : 'Bike',
-                        'MountainBike' : 'Bike',
-                        'Panda'        : 'Panda',
-                        'Shaking'      : 'Face',
-                        'Singer1'      : 'Person',
-                        'Skater'       : 'Person',
-                        'Skater2'      : 'Person',
-                        'Skating1'     : 'Person',
-                        'Skating2'     : 'Person',
-                        'Soccer'       : 'Face',
-                        'Subway'       : 'Person',
-                        'Surfer'       : 'Face',
-                        'Suv'          : 'Car',
-                        'Trellis'      : 'Face',
-                        'Walking'      : 'Person',
-                        'Walking2'     : 'Person',
-                        'Woman'        : 'Person'
-                    }
 
 # 640 * 360 px
 import os
 import cv2
+import json
 from lxml import etree, objectify
 
 def root(folder, filename, width, height):
@@ -115,7 +38,12 @@ def create_annotations(validation_split):
     anns       = []
     anns_dict  = {}
     exclusions = ['panda-all.txt']
-    ann_dir    = 'data/VisualTrackingBenchmark/'
+
+    with open("config.json") as config_buffer:
+        config = json.loads(config_buffer.read())
+
+    ann_dir        = config['train']['train_image_folder']
+    LABELS_DIR_MAP = config['classes']['classes_map']
 
     # for dirs where numbering for frames does not start from 0001.jpg
     start_frame =   {
@@ -168,7 +96,7 @@ def create_annotations(validation_split):
     for ann in anns:
         xml_data = {}
         for idx, gt in enumerate(ann['gt']):
-            gt_path  = 'data/VisualTrackingBenchmark/' + ann['folder'] + '/' + gt
+            gt_path  = ann_dir + ann['folder'] + '/' + gt
             with open(gt_path) as f:
                 lines = f.readlines()
                 frame = 1
@@ -205,14 +133,16 @@ def create_annotations(validation_split):
                 annotation.append(instance_to_xml(instance))
 
             if count<=((1-validation_split)*length):
-                if not os.path.isdir('data/VisualTBAnn/train/' + ann['folder']):
-                    os.makedirs('data/VisualTBAnn/train/' + ann['folder'])
-                outfile = 'data/VisualTBAnn/train/' + ann['folder'] + '/{}.xml'.format(frame.zfill(4))
+                path = config['train']['train_annot_folder'] + ann['folder']
+                if not os.path.isdir(path):
+                    os.makedirs(path)
+                outfile = path + '/{}.xml'.format(frame.zfill(4))
                 etree.ElementTree(annotation).write(outfile, pretty_print=True)
             else:
-                if not os.path.isdir('data/VisualTBAnn/val/' + ann['folder']):
-                    os.makedirs('data/VisualTBAnn/val/' + ann['folder'])
-                outfile = 'data/VisualTBAnn/val/' + ann['folder'] + '/{}.xml'.format(frame.zfill(4))
+                path = config['val']['val_annot_folder'] + ann['folder']
+                if not os.path.isdir(path):
+                    os.makedirs(path)
+                outfile = path + '/{}.xml'.format(frame.zfill(4))
                 etree.ElementTree(annotation).write(outfile, pretty_print=True)
             count += 1
 

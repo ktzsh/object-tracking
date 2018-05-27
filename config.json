@@ -1,0 +1,126 @@
+{
+    "model_detector" : {
+        "name"         : "YOLO",
+        "config_file"  : "cfg/yolov2.cfg",
+        "meta_file"    : "cfg/coco.data",
+        "weights_file" : "yolov2.weights",
+        "output_dir"   : "output/",
+        "image_ext"    : "jpg",
+        "fv_layer"     : 25,
+
+        "__comment__"  : "ONLY for YOLO",
+        "nms"          : 0.45,
+        "thresh"       : 0.5,
+        "hier_thresh"  : 0.5
+    },
+
+    "model_tracker" : {
+        "name"            : "TinyTracker",
+        "lstm_units"      : 512,
+        "sequence_length" : 4,
+        "heatmap_size"    : 32
+    },
+
+    "train" : {
+        "train_image_folder" : "data/VisualTB/",
+        "train_annot_folder" : "data/VisualTBAnn/train/",
+
+        "cpu_only"           : 1,
+        "dgpu_id"            : 1,
+        "tgpu_id"            : 0,
+
+        "pool"               : "Global",
+        "batch_size"         : 4,
+        "max_epochs"         : 100,
+
+        "tensorboard_dir"    : "logs/",
+        "saved_model_dir"    : "models/",
+
+        "classes"            : ["Person", "Car"],
+
+        "debug"              : 0
+    },
+
+    "val" : {
+        "val_image_folder" : "data/VisualTB/",
+        "val_annot_folder" : "data/VisualTBAnn/val/"
+    },
+
+    "classes" : {
+        "__comment__" : "DO NOT MODIFY THIS...CHANGE 'classes' KEY IN 'train' ABOVE....This Map is for VisualTB Dataset manually mapped to classes in ImageNet Challenge. This should always be be superset to classes chosen above",
+
+        "classes"     : ["Person", "Face", "Bird", "Car", "Deer", "Dog", "Bike", "Panda"],
+        "classes_map" : {
+                            "Basketball"   : "Person",
+                            "Biker"        : "Face",
+                            "Bird1"        : "Bird",
+                            "Bird2"        : "Bird",
+                            "BlurBody"     : "Person",
+                            "BlurCar1"     : "Car",
+                            "BlurCar2"     : "Car",
+                            "BlurCar3"     : "Car",
+                            "BlurCar4"     : "Car",
+                            "BlurFace"     : "Face",
+                            "Bolt"         : "Person",
+                            "Bolt2"        : "Person",
+                            "Boy"          : "Face",
+                            "Car1"         : "Car",
+                            "Car2"         : "Car",
+                            "Car24"        : "Car",
+                            "Car4"         : "Car",
+                            "CarDark"      : "Car",
+                            "CarScale"     : "Car",
+                            "Couple"       : "Person",
+                            "Crossing"     : "Person",
+                            "Crowds"       : "Person",
+                            "Dancer2"      : "Person",
+                            "David"        : "Face",
+                            "David2"       : "Face",
+                            "David3"       : "Person",
+                            "Deer"         : "Deer",
+                            "Dog"          : "Dog",
+                            "Dudek"        : "Face",
+                            "FaceOcc1"     : "Face",
+                            "FaceOcc2"     : "Face",
+                            "FleetFace"    : "Face",
+                            "Football"     : "Face",
+                            "Freeman1"     : "Face",
+                            "Freeman4"     : "Face",
+                            "Girl"         : "Face",
+                            "Girl2"        : "Person",
+                            "Gym"          : "Person",
+                            "Human2"       : "Person",
+                            "Human3"       : "Person",
+                            "Human4"       : "Person",
+                            "Human5"       : "Person",
+                            "Human6"       : "Person",
+                            "Human7"       : "Person",
+                            "Human8"       : "Person",
+                            "Human9"       : "Person",
+                            "Jogging"      : "Person",
+                            "Jump"         : "Person",
+                            "Jumping"      : "Face",
+                            "KiteSurf"     : "Face",
+                            "Man"          : "Face",
+                            "Matrix"       : "Face",
+                            "Mhyang"       : "Face",
+                            "MotorRolling" : "Bike",
+                            "MountainBike" : "Bike",
+                            "Panda"        : "Panda",
+                            "Shaking"      : "Face",
+                            "Singer1"      : "Person",
+                            "Skater"       : "Person",
+                            "Skater2"      : "Person",
+                            "Skating1"     : "Person",
+                            "Skating2"     : "Person",
+                            "Soccer"       : "Face",
+                            "Subway"       : "Person",
+                            "Surfer"       : "Face",
+                            "Suv"          : "Car",
+                            "Trellis"      : "Face",
+                            "Walking"      : "Person",
+                            "Walking2"     : "Person",
+                            "Woman"        : "Person"
+                        }
+    }
+}

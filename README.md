@@ -1,7 +1,6 @@
-# object-tracking
+# Object Tracking
 1. Simultaneous Multiple Object Detection and Tracking System in Keras (Detection network based on YOLOv2 - reimplemented in keras)
 2. Single Object Tracking with FasterRCNN and YOLOv2/v3 as detection backends
-
 
 # Trackers Available:
 1. TinyTracker (Static Detection Priors from FasterRCNN or Yolov2/v3)[Single Object]:
@@ -10,44 +9,58 @@
 
 NOTE: Yolov2 reimplementation in Keras as standalone detector also available
 
-# Dependencies
-Tensorflow
-Keras
-OpenCV
-easydict (for py-faster-rcnn)
-cython (for py-faster-rcnn)
+## Dependencies
+1. Tensorflow
+2. Keras
+3. OpenCV
+4. easydict (for py-faster-rcnn)
+5. cython (for py-faster-rcnn)
+6. imgaug
 
+## Instllation
+1. Run `git clone --recursive https://github.com/kshitiz38/object-tracking.git`
+    - NOTE: If you didn't clone with the --recursive flag run manually the following code
+        `git submodule update --init --recursive`
 
-#Instllation
-1. git clone --recursive https://github.com/kshitiz38/object-tracking.git
-    NOTE: If you didn't clone with the --recursive flag run manually the following code
-        git submodule update --init --recursive
+2. Darknet
+    - Follow instructions at https://pjreddie.com/darknet/install/
+        `cd darknet && make`
+    - NOTE: I recommend disabling CUDNN in Makefile since it gives strange results depending on your version
 
-2a. Darknet
-    cd darknet
-    Follow instructions at https://pjreddie.com/darknet/install/
+3. Faster RCNN
+    - Follow intructions at https://github.com/rbgirshick/py-faster-rcnn#installation-sufficient-for-the-demo
+        ````
+        cd py-faster-rcnn
+        cd lib && make && cd ../
+        cd caffe-fast-rcnn && mkdir build && cd build && cmake ..
+        make all && make install
+        ````
 
-2b. Faster RCNN
-    cd py-faster-rcnn
-    Follow intructions at https://github.com/rbgirshick/py-faster-rcnn#installation-sufficient-for-the-demo
+## Usage
+1. For Single Object Tracking
+    1. Modify Parameters in config.jon
+    2. Convert Datasets to PASCAL VOC format if not already
+        - Run `python utility/tb_to_pascal.py' or 'python utility/tb_to_pascal.py` or write one for your own dataset
+    3. Run `python trainer.py`
+2. For Simultaneous Multiple Object Detection and Tracking
+    1. Modify Parameters in `KerasYOLO.py` and `MultiObjDetTracker.py`
+    2. Convert Datasets like above specify paths in `MultiObjDetTracker.py` already done for ImageNet Vid and MOT17
+    3. Run `python trainer.py`
 
+### NOTE :
+- Call `single_object_tracking()` in `trainer.py` for Single Object Detection with fixed detection priors from Other Detection backends
+- Call `simult_multi_obj_detection_tracking()` in `trainer.py` for Simultaneous Multiple Object Detction and Tracking with Yolov2 Reimplemented in Keras
 
-# Usage
-python trainer.py
-Parameters(Open trainer.py):
-    1. simult_multi_obj_detection_tracking()
-    2. single_object_tracking()
-        _TRACKER:  (TinyTracker, TinyHeatmapTracker) [see model archs for details]
-        _DETECTOR: (YOLO, FasterRCNN)  [detection priors - more params in each model file]
-        _POOL:     (Global, Max, None) [see model archs for details]
-        ....
+## Model Architectures
+- Coming Soon!!
+- Feel free to figure out yourself!! See `models_tracking` and `models_detection` directories
 
-# TODOs
-1. Randomize data generator for trackers 1,2
-2. Update Usage section README
-3. Benchmark simult_multi_obj_detection_tracking for ImagenetVid Challenge
+## TODOs
+- [ ] Add theory and model architectures explaination
+- [ ] Add config.json file for parameters for MultiObjDetTracker and KerasYOLO
+- [ ] Benchmark for ImagenetVid Challenge, MOT and VisualTB Datasets
+- [ ] Add support for Detectron models as detection backend
 
-
-# References
+## References
 1. https://github.com/Guanghan/ROLO
 2. https://github.com/experiencor/keras-yolo2

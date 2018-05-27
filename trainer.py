@@ -1,61 +1,19 @@
 import os
+import json
+import importlib
 from utility.utils import prepare_data
 from models_detection.KerasYOLO import KerasYOLO
-from models_tracking.TinyTracker import TinyTracker
-from models_tracking.TinyHeatmapTracker import TinyHeatmapTracker
 from models_tracking.MultiObjDetTracker import MultiObjDetTracker
 
 def single_object_tracking():
-    train_data_dirs = [
-                    'Human2',     'Human3',   'Human5',     'Human6',   'Human7',
-                    'Human9',     'Woman',    'Jogging-1',  'Walking',  'Walking2',
-                    'Subway',     'Singer1',  'Walking2',   'Jump',     'Biker',
-                    'BlurBody',   'Car2',     'Car24',       'CarDark',  'CarScale',
-                    'Suv',        'David3',   'Dancer2',    'Gym',      'Basketball',
-                    'Skating2-2'
-                ]
+    with open("config.json") as config_buffer:
+        config = json.loads(config_buffer.read())
 
-    val_data_dirs = [
-                        'Human4',  'Human8',  'Jogging-2',  'Skater',     #'Girl2',
-                        'Car1',    'Car4',   'Skating2-1', #'Dancer'
-                    ]
+    tracker_name  = config["model_tracker"]["name"]
+    tracker_class = getattr(importlib.import_module("models_tracking." + tracker_name), tracker_name)
+    tracker       = tracker_class()
 
-    _CONFIG = {
-                '_TRACKER'       : 'TinyTracker', #TinyHeatmapTracker
-                '_DETECTOR'      : 'YOLO', #(FasterRCNN, relu5_3) (YOLO, 80)
-                '_DET_FV_LAYER'  : 29,
-                '_CPU_ONLY'      : 1,
-                '_TRACKER_GPUID' : 0,
-                '_DETECTOR_GPUID': 1,
-                '_POOL'          : 'Global', #(Max, Global, None)
-                '_BATCH_SIZE'    : 1,
-                '_MAX_EPOCHS'    : 50
-    }
-
-    config = [
-                _CONFIG['_DETECTOR'],
-                _CONFIG['_CPU_ONLY'],
-                _CONFIG['_TRACKER_GPUID'],
-                _CONFIG['_DETECTOR_GPUID'],
-                _CONFIG['_POOL'],
-                _CONFIG['_BATCH_SIZE'],
-                _CONFIG['_MAX_EPOCHS'],
-                _CONFIG['_DET_FV_LAYER']
-            ]
-
-    if _CONFIG['_CPU_ONLY']==0:
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(_CONFIG['_TRACKER_GPUID'])
-
-    if _CONFIG['_TRACKER']=='TinyTracker':
-        tracker = TinyTracker(config)
-    elif _CONFIG['_DETECTOR']=='TinyHeatmapTracker':
-        tracker = TinyHeatmapTracker(config)
-
-    train_data = prepare_data(train_data_dirs)
-    val_data = prepare_data(val_data_dirs)
-
-    tracker.train(train_data, val_data)
+    tracker.train()
 
 def simult_multi_obj_detection_tracking():
     model = MultiObjDetTracker()
@@ -75,6 +33,8 @@ if __name__=='__main__':
 
     if not os.path.exists('logs'):
         os.mkdir('logs/')
+    if not os.path.exists('models'):
+        os.mkdir('models/')
 
     # single_object_tracking()
     simult_multi_obj_detection_tracking()

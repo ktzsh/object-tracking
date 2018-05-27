@@ -1,6 +1,7 @@
-from ctypes import *
-import numpy as np
 import os
+import json
+import numpy as np
+from ctypes import *
 
 class BOX(Structure):
     _fields_ = [("x", c_float),
@@ -36,21 +37,23 @@ class DIMS(Structure):
                 ("c", c_int)]
 
 class YOLO:
-
-    net         = None
-    meta        = None
-    gpu_id      = 1
-    cpu_mode    = 0
-    NMS         = 0.45
-    THRESH      = 0.5
-    HIER_THRESH = 0.5
-
-    META        = 'cfg/coco.data'
-    CONFIG      = 'cfg/yolov2.cfg'
-    WEIGHTS     = 'yolov2.weights'
-    CLASSES     = ['car', 'truck', 'person']
-
     def __init__(self, argvs=[]):
+
+        with open("config.json") as config_buffer:
+            self.config = json.loads(config_buffer.read())
+
+        self.gpu_id      = self.config["train"]["dgpu_id"]
+        self.cpu_mode    = self.config["train"]["cpu_only"]
+
+        self.CLASSES     = [s.lower() for s in self.config["train"]["classes"]]
+
+        self.NMS         = self.config["model_detector"]["nms"]
+        self.THRESH      = self.config["model_detector"]["thresh"]
+        self.HIER_THRESH = self.config["model_detector"]["hier_thresh"]
+
+        self.META        = self.config["model_detector"]["meta_file"]
+        self.CONFIG      = self.config["model_detector"]["config_file"]
+        self.WEIGHTS     = self.config["model_detector"]["weights_file"]
 
         lib = CDLL("darknet/libdarknet.so", RTLD_GLOBAL)
 
@@ -132,7 +135,7 @@ class YOLO:
 
     def get_layer_dims(self, n):
         info = self.layer_dims(self.net, n)
-        return (info.w, info.h, info.c)
+        return (info.h, info.w, info.c)
 
     def detect(self, image):
         im   = self.load_image(image, 0, 0)
@@ -151,6 +154,7 @@ class YOLO:
             for i in range(self.meta.classes):
                 if dets[j].prob[i] > 0:
                     b = dets[j].bbox
+                    # midpoint coordinates and height width
                     res.append((self.meta.names[i], dets[j].prob[i], (b.x, b.y, b.w, b.h)))
         res = sorted(res, key=lambda x: -x[1])
         self.free_image(im)

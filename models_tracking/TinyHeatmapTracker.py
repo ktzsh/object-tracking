@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from BaseTracker import BaseTracker
+from utility.preprocessing import parse_annotation, BatchSequenceGenerator2
+
 from keras import backend as K
 from keras.layers.normalization import BatchNormalization
 from keras.layers import Activation, Input, LSTM, Dense, Dropout, Conv2D, Flatten, MaxPooling2D, Reshape, GlobalMaxPooling2D
@@ -12,22 +14,22 @@ from keras.preprocessing.sequence import pad_sequences
 #  --------------------------------------------------------------------------------------------------------------------
 
 class TinyHeatmapTracker(BaseTracker):
+    def __init__(self):
+        super(TinyHeatmapTracker, self).__init__()
 
-    INPUT_FEAT         = 512
-    LSTM_UNITS         = 512
-    HEATMAP_SIZE       = 32
-    SEQUENCE_LENGTH    = 6
-
-    model_tracker      = None
-    model_detector     = None
-    detection_model    = None
-
-    def __init__(self, argv):
-        super(TinyHeatmapTracker, self).__init__(argv)
+        self.LSTM_UNITS         = self.config["model_tracker"]["lstm_units"]
+        self.SEQUENCE_LENGTH    = self.config["model_tracker"]["sequence_length"]
+        self.HEATMAP_SIZE       = self.config["model_tracker"]["heatmap_size"]
         self.load_tracker_model()
 
 
     def load_tracker_model(self):
+
+        def custom_acc(y_true, y_pred):
+            positive_ones = K.sum((y_true * y_pred), axis=-1)
+            total_ones    = K.sum(y_true, axis=-1)
+            return K.mean((positive_ones / total_ones), axis=-1)
+
         img_input = Input(shape=(self.SEQUENCE_LENGTH, self._w, self._h, self._c), dtype='float32', name='image_fv_input')
         det_input = Input(shape=(self.SEQUENCE_LENGTH, (self.HEATMAP_SIZE**2)), dtype='float32', name='detection_bbox_input')
 
@@ -36,61 +38,32 @@ class TinyHeatmapTracker(BaseTracker):
             x = TimeDistributed(Flatten(name='flatten'))(x)
         elif self.pool=='Global':
             x = TimeDistributed(GlobalMaxPooling2D(name='pool1'))(img_input)
-        x = TimeDistributed(Dense(self.INPUT_FEAT, activation='relu', name='fc1'))(x)
-
         x = concatenate([x, det_input])
 
         x = LSTM(self.LSTM_UNITS, return_sequences=True, implementation=2, name='recurrent_layer')(x)
         output = TimeDistributed(Dense((self.HEATMAP_SIZE**2), activation='sigmoid', name='output'))(x)
 
-        model = Model(inputs=[img_input, det_input], outputs=output)
-        optimizer = Adam(lr=0.01, decay=0.0)
-        model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-        self.model_tracker = model
-        model.summary()
+        self.model_tracker = Model(inputs=[img_input, det_input], outputs=output)
+        self.model_tracker.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.001, decay=0.0), metrics=[custom_acc])
+        self.model_tracker.summary()
 
+    def load_data_generators(self):
+        generator_config = {
+            'IMAGE_FV_H'         : self._h,
+            'IMAGE_FV_W'         : self._w,
+            'IMAGE_FV_C'         : self._c,
+            'OUTPUT_SHAPE'       : (self.HEATMAP_SIZE**2,),
+            'HEATMAP_SIZE'       : self.HEATMAP_SIZE,
+            'DETECTION_FV_LAYER' : self.detection_fv_layer,
+            'DETECTOR'           : self.model_detector,
+            'BATCH_SIZE'         : self.batch_size,
+            'SEQUENCE_LENGTH'    : self.sequence_length
+        }
 
-    def get_batch(self, argv):
-        idx = 0
-        frame_dim_dirs = argv[0]
-        frame_paths_dirs = argv[1]
-        frame_bboxs_dirs = argv[2]
+        train_imgs, seen_train_labels = parse_annotation(self.train_annot_folder, self.train_image_folder, labels=self.classes)
+        valid_imgs, seen_valid_labels = parse_annotation(self.val_annot_folder, self.val_image_folder, labels=self.classes)
 
-        x_img = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, self._w, self._h, self._c), dtype='float32')
-        x_bbox = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, (self.HEATMAP_SIZE**2)), dtype='float32')
-        y_bbox = np.zeros((self.batch_size, self.SEQUENCE_LENGTH, (self.HEATMAP_SIZE**2)), dtype='float32')
+        train_batch = BatchSequenceGenerator2(train_imgs, generator_config, shuffle=True, augment=False)
+        valid_batch = BatchSequenceGenerator2(valid_imgs, generator_config, shuffle=False, augment=False)
 
-        while 1:
-            for i, (frame_paths, frame_bboxs, frame_dim) in enumerate(zip(frame_paths_dirs, frame_bboxs_dirs, frame_dim_dirs)):
-                frame_height, frame_width = frame_dim[0], frame_dim[1]
-                sequence_size = len(frame_paths)
-
-                for j in range(sequence_size - self.SEQUENCE_LENGTH):
-                    frame_path, frame_bbox = frame_paths[j], frame_bboxs[j]
-
-                    obj_detections, vis_feat = self.model_detector.extract_spatio_info(frame_path, self.detection_fv_layer)
-                    vis_feat = vis_feat.reshape((self._w, self._h, self._c))
-
-                    print "BBOX FROM DETECTION", obj_detections
-
-                    for k in range(self.SEQUENCE_LENGTH):
-                        obj_det, vis_feat = self.model_detector.extract_spatio_info(frame_paths[j+k], self.detection_fv_layer)
-                        vis_feat = vis_feat.reshape((self._w, self._h, self._c))
-
-                        det_x = (frame_bboxs[j+k][0] + frame_bboxs[j+k][2]/2.0) / frame_width
-                        det_y = (frame_bboxs[j+k][1] + frame_bboxs[j+k][3]/2.0) / frame_height
-                        det_w = (frame_bboxs[j+k][2]) / frame_width
-                        det_h = (frame_bboxs[j+k][3]) / frame_height
-
-                        det_x_in = (obj_det[0][2][0]) / frame_width
-                        det_y_in = (obj_det[0][2][1]) / frame_height
-                        det_w_in = (obj_det[0][2][2]) / frame_width
-                        det_h_in = (obj_det[0][2][3]) / frame_height
-
-                        x_img[idx, k, :, :, :] = vis_feat
-                        x_bbox[idx, k, :] = generate_heatmap_feat(det_x_in - det_w_in/2.0, det_y_in - det_h_in/2.0, det_w_in, det_h_in, hmap_size=self.HEATMAP_SIZE)
-                        y_bbox[idx, k, :] = generate_heatmap_feat(det_x - det_w/2.0, det_y - det_h/2.0, det_w, det_h, hmap_size=self.HEATMAP_SIZE)
-
-                    idx = (idx + 1) % self.batch_size
-                    if idx==0:
-                        yield ([x_img, x_bbox], y_bbox)
+        return train_batch, valid_batch

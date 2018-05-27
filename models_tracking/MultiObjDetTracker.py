@@ -2,7 +2,7 @@ import pickle
 import os, cv2
 import numpy as np
 from models_detection.KerasYOLO import KerasYOLO
-from utility.preprocessing import parse_annotation, BatchSequenceGenerator
+from utility.preprocessing import parse_annotation, BatchSequenceGenerator1
 from utility.utils import WeightReader, decode_netout, draw_boxes, normalize
 
 import tensorflow as tf
@@ -184,11 +184,6 @@ class MultiObjDetTracker:
 
 
     def load_data_generators(self, generator_config):
-        train_imgs   = None
-        valid_imgs   = None
-        train_batch  = None
-        valid_batch  = None
-
         # pickle_train = 'data/MultiObjDetTracker_TrainAnn.pickle'
         # pickle_val   = 'data/MultiObjDetTracker_ValAnn.pickle'
         pickle_train = 'data/MultiObjDetTracker_MOT17_TrainAnn.pickle'
@@ -212,10 +207,8 @@ class MultiObjDetTracker:
                pickle.dump(valid_imgs, fp)
 
 
-        print "TRAIN GEN", len(train_imgs), generator_config
-        train_batch = BatchSequenceGenerator(train_imgs, generator_config, norm=normalize, shuffle=True, augment=False)
-        print "VALID GEN", len(valid_imgs), generator_config
-        valid_batch = BatchSequenceGenerator(valid_imgs, generator_config, norm=normalize, augment=False)
+        train_batch = BatchSequenceGenerator1(train_imgs, generator_config, norm=normalize, shuffle=True, augment=False)
+        valid_batch = BatchSequenceGenerator1(valid_imgs, generator_config, norm=normalize, augment=False)
 
         return train_batch, valid_batch
 
