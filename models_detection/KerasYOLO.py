@@ -49,7 +49,7 @@ class KerasYOLO:
     COORD_SCALE      = 1.0
     CLASS_SCALE      = 1.0
 
-    BATCH_SIZE       = 1
+    BATCH_SIZE       = 32
     WARM_UP_BATCHES  = 0
     TRUE_BOX_BUFFER  = 50
 

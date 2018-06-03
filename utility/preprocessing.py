@@ -279,9 +279,9 @@ class BatchGenerator(BaseBatchGenerator):
                                 0, 1.2e-3 * img.shape[0],
                                 (0,255,0), 2)
 
-            if not os.path.isdir('data/self.debug/' + str(idx)):
-                os.makedirs('data/self.debug/' + str(idx))
-            file_path = 'data/self.debug/' + str(idx) + '/' + train_instance['filename'].split('/')[-1]
+            if not os.path.isdir('data/debug/' + str(idx)):
+                os.makedirs('data/debug/' + str(idx))
+            file_path = 'data/debug/' + str(idx) + '/' + train_instance['filename'].split('/')[-1]
             cv2.imwrite(file_path, img)
 
         # assign input image to x
@@ -466,9 +466,9 @@ class BatchSequenceGenerator2(BaseBatchGenerator):
                                 0, 1.2e-3 * img.shape[0],
                                 (0,255,0), 2)
 
-            if not os.path.isdir('data/self.debug/' + str(idx)):
-                os.makedirs('data/self.debug/' + str(idx))
-            file_path = 'data/self.debug/' + str(idx) + '/' + train_instance['filename'].split('/')[-1]
+            if not os.path.isdir('data/debug/' + str(idx)):
+                os.makedirs('data/debug/' + str(idx))
+            file_path = 'data/debug/' + str(idx) + '/' + train_instance['filename'].split('/')[-1]
             cv2.imwrite(file_path, img)
 
         # assign input to x
@@ -504,5 +504,5 @@ class BatchSequenceGenerator2(BaseBatchGenerator):
 
     def on_epoch_end(self):
         os.rmdir('data/tmp/')
-        os.rmdir('data/self.debug/')
+        os.rmdir('data/debug/')
         super(BatchSequenceGenerator2, self).on_epoch_end()

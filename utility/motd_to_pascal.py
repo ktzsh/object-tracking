@@ -59,60 +59,67 @@ def instance_to_xml(obj):
 
 def create_annotations(validation_split):
     anns = []
-    ann_dir = 'data/MOT17/MOT17DetLabels/train/'
-    for (dirpath, dirnames, filenames) in os.walk(ann_dir):
-        if len(filenames)==0:
-            continue
-        for filename in sorted(filenames):
-            if filename.endswith('.ini')==True:
-                ann      = {}
-                seq_info = dirpath + '/' + filename
-                with open(seq_info) as f:
-                    lines         = f.readlines()
-                    ann['folder'] = lines[1].rstrip('\n').split('=')[-1]
-                    ann['imdir']  = lines[2].rstrip('\n').split('=')[-1]
-                    ann['length'] = lines[4].rstrip('\n').split('=')[-1]
-                    ann['width']  = lines[5].rstrip('\n').split('=')[-1]
-                    ann['height'] = lines[6].rstrip('\n').split('=')[-1]
-                    ann['imext']  = lines[7].rstrip('\n').split('=')[-1]
-                anns.append(ann)
+    ann_dirs = ['data/MOT17/MOT17DetLabels/train/', 'data/MOT17/MOT17DetLabels/test/']
+    for ann_dir in ann_dirs:
+        for (dirpath, dirnames, filenames) in os.walk(ann_dir):
+            if len(filenames)==0:
+                continue
+            for filename in sorted(filenames):
+                if filename.endswith('.ini')==True:
+                    ann      = {}
+                    seq_info = dirpath + '/' + filename
+                    with open(seq_info) as f:
+                        lines         = f.readlines()
+                        ann['folder'] = lines[1].rstrip('\n').split('=')[-1]
+                        ann['imdir']  = lines[2].rstrip('\n').split('=')[-1]
+                        ann['length'] = lines[4].rstrip('\n').split('=')[-1]
+                        ann['width']  = lines[5].rstrip('\n').split('=')[-1]
+                        ann['height'] = lines[6].rstrip('\n').split('=')[-1]
+                        ann['imext']  = lines[7].rstrip('\n').split('=')[-1]
+                    anns.append(ann)
 
-    for ann in anns:
-        xml_data = {}
-        gt_path  = 'data/MOT17/MOT17DetLabels/train/' + ann['folder'] + '/gt/gt.txt'
-        with open(gt_path) as f:
-            lines = f.readlines()
-            for line in lines:
-                frame, tid, xmin, ymin, width, height, score, class_id, visibility = line.rstrip('\n').split(',')
-                if frame not in xml_data:
-                    xml_data[frame] = []
-                obj = {}
-                obj['trackid'] = tid
-                obj['xmin']    = xmin
-                obj['ymin']    = ymin
-                obj['xmax']    = str(int(xmin) + int(width))
-                obj['ymax']    = str(int(ymin) + int(height))
-                obj['name']    = class_id
-                xml_data[frame].append(obj)
+        for ann in anns:
+            xml_data = {}
+            gt_path  = ann_dir + ann['folder'] + '/gt/gt.txt'
+            with open(gt_path) as f:
+                lines = f.readlines()
+                for line in lines:
+                    frame, tid, xmin, ymin, width, height, score, class_id, visibility = line.rstrip('\n').split(',')
+                    if frame not in xml_data:
+                        xml_data[frame] = []
+                    obj = {}
+                    obj['trackid'] = tid
+                    obj['xmin']    = xmin
+                    obj['ymin']    = ymin
+                    obj['xmax']    = str(int(xmin) + int(width))
+                    obj['ymax']    = str(int(ymin) + int(height))
+                    obj['name']    = class_id
+                    xml_data[frame].append(obj)
 
-        count  = 1
-        length = len(xml_data)
-        for frame in sorted(xml_data.keys(), key = lambda x: int(x)):
-            annotation = root(ann['folder'] + '/' + ann['imdir'], frame.zfill(6) + ann['imext'], ann['width'], ann['height'])
-            for instance in xml_data[frame]:
-                annotation.append(instance_to_xml(instance))
+            count  = 1
+            length = len(xml_data)
+            for frame in sorted(xml_data.keys(), key = lambda x: int(x)):
+                annotation = root(ann['folder'] + '/' + ann['imdir'], frame.zfill(6) + ann['imext'], ann['width'], ann['height'])
+                for instance in xml_data[frame]:
+                    annotation.append(instance_to_xml(instance))
 
-            if count<=((1-validation_split)*length):
-                if not os.path.isdir('data/MOT17Ann/train/' + ann['folder']):
-                    os.makedirs('data/MOT17Ann/train/' + ann['folder'])
-                outfile = 'data/MOT17Ann/train/' + ann['folder'] + '/{}.xml'.format(frame.zfill(6))
-                etree.ElementTree(annotation).write(outfile, pretty_print=True)
-            else:
-                if not os.path.isdir('data/MOT17Ann/val/' + ann['folder']):
-                    os.makedirs('data/MOT17Ann/val/' + ann['folder'])
-                outfile = 'data/MOT17Ann/val/' + ann['folder'] + '/{}.xml'.format(frame.zfill(6))
-                etree.ElementTree(annotation).write(outfile, pretty_print=True)
-            count += 1
+                if ann_dir.split('/')[-2] == 'train':
+                    if count<=((1-validation_split)*length):
+                        if not os.path.isdir('data/MOT17Ann/train/' + ann['folder']):
+                            os.makedirs('data/MOT17Ann/train/' + ann['folder'])
+                        outfile = 'data/MOT17Ann/train/' + ann['folder'] + '/{}.xml'.format(frame.zfill(6))
+                        etree.ElementTree(annotation).write(outfile, pretty_print=True)
+                    else:
+                        if not os.path.isdir('data/MOT17Ann/val/' + ann['folder']):
+                            os.makedirs('data/MOT17Ann/val/' + ann['folder'])
+                        outfile = 'data/MOT17Ann/val/' + ann['folder'] + '/{}.xml'.format(frame.zfill(6))
+                        etree.ElementTree(annotation).write(outfile, pretty_print=True)
+                    count += 1
+                else:
+                    if not os.path.isdir('data/MOT17Ann/test/' + ann['folder']):
+                        os.makedirs('data/MOT17Ann/test/' + ann['folder'])
+                    outfile = 'data/MOT17Ann/test/' + ann['folder'] + '/{}.xml'.format(frame.zfill(6))
+                    etree.ElementTree(annotation).write(outfile, pretty_print=True)
 
 if __name__=="__main__":
 

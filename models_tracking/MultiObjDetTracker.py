@@ -12,7 +12,7 @@ K.set_learning_phase(1)
 from keras.models import Sequential, Model
 from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, Flatten, Dense, Lambda, ConvLSTM2D
 from keras.layers.advanced_activations import LeakyReLU
-from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.merge import concatenate
@@ -80,8 +80,8 @@ class MultiObjDetTracker:
                     ]
 
     LABELS           = LABELS_MOT17
-    IMAGE_H, IMAGE_W = 608, 608 # 416
-    GRID_H,  GRID_W  = 19 , 19  # 13
+    IMAGE_H, IMAGE_W = 416, 416 # 416
+    GRID_H,  GRID_W  = 13 , 13  # 13
     BOX              = 5
     CLASS            = len(LABELS)
     CLASS_WEIGHTS    = np.ones(CLASS, dtype='float32')
@@ -101,6 +101,10 @@ class MultiObjDetTracker:
     SEQUENCE_LENGTH   = 4
     MAX_BOX_PER_IMAGE = 50
 
+    LOAD_MODEL        = True
+    INITIAL_EPOCH     = 0
+    SAVED_MODEL_PATH  = 'models/MultiObjDetTracker-CHKPNT-03-0.55.hdf5'
+
     # train_image_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Data/VID/train/'
     # train_annot_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Annotations/VID/train/'
     # valid_image_folder = 'data/ImageNet-ObjectDetection/ILSVRC2015Train/Data/VID/val/'
@@ -117,7 +121,7 @@ class MultiObjDetTracker:
 
     def __init__(self, argv={}):
         argv['LABELS']        = self.LABELS
-        argv['BATCH_SIZE']    = self.BATCH_SIZE
+        argv['BATCH_SIZE']    = self.BATCH_SIZE * self.SEQUENCE_LENGTH
         argv['IMAGE_H']       = self.IMAGE_H
         argv['IMAGE_W']       = self.IMAGE_W
         argv['GRID_H']        = self.GRID_H
@@ -125,6 +129,8 @@ class MultiObjDetTracker:
 
         self.detector = KerasYOLO(argv)
         self.load_model()
+        if self.LOAD_MODEL:
+            self.load_weights()
 
     def loss_fxn(self, y_true, y_pred, tboxes, message=''):
         return self.detector.loss_fxn(y_true, y_pred, tboxes, message=message)
@@ -167,7 +173,7 @@ class MultiObjDetTracker:
         output_det = TimeDistributed(Reshape((self.GRID_H, self.GRID_W, self.BOX, 4 + 1 + self.CLASS)), name='detection')(x_bbox)
 
         z = concatenate([x_bbox, x_vis])
-        z_vis = ConvLSTM2D(1024, (3,3), strides=(1,1), padding='same', return_sequences=True, name='tconv_lstm')(z)
+        z_vis = ConvLSTM2D(512, (3,3), strides=(1,1), padding='same', return_sequences=True, name='tconv_lstm')(z)
 
         # z = TimeDistributed(Conv2D(1024, (3,3), strides=(1,1), padding='same', use_bias=False, name='tconv_1'), name='timedist_tconv1')(z)
         # z = TimeDistributed(BatchNormalization(name='tnorm_1'), name='timedist_tnorm')(z)
@@ -207,7 +213,7 @@ class MultiObjDetTracker:
                pickle.dump(valid_imgs, fp)
 
 
-        train_batch = BatchSequenceGenerator1(train_imgs, generator_config, norm=normalize, shuffle=True, augment=False)
+        train_batch = BatchSequenceGenerator1(train_imgs, generator_config, norm=normalize, shuffle=True, augment=True)
         valid_batch = BatchSequenceGenerator1(valid_imgs, generator_config, norm=normalize, augment=False)
 
         return train_batch, valid_batch
@@ -244,13 +250,20 @@ class MultiObjDetTracker:
                                    mode      = 'min',
                                    verbose   = 1)
 
-        checkpoint = ModelCheckpoint('weights/WEIGHTS_MultiObjDetTracker.h5',
+        checkpoint = ModelCheckpoint('models/MultiObjDetTracker-CHKPNT-{epoch:02d}-{val_loss:.2f}.hdf5',
                                      monitor        = 'val_loss',
                                      verbose        = 1,
-                                     save_best_only = True,
+                                     save_best_only = False,
                                      # save_weights_only = True,
                                      mode           = 'min',
                                      period         = 1)
+
+        reduce_lr = ReduceLROnPlateau(monitor  = 'val_loss',
+                                      factor   = 0.5,
+                                      patience = 2,
+                                      verbose  = 1,
+                                      mode     = 'auto',
+                                      min_lr   = 1e-5)
 
         tb_counter  = len([log for log in os.listdir(os.path.expanduser('./logs/')) if 'MultiObjDetTracker_' in log]) + 1
         tensorboard = TensorBoard(log_dir        = os.path.expanduser('./logs/') + 'MultiObjDetTracker_' + str(tb_counter),
@@ -258,11 +271,11 @@ class MultiObjDetTracker:
                                   write_graph    = True,
                                   write_images   = False)
 
-        optimizer = Adam(lr=1e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        optimizer = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         #optimizer = SGD(lr=1e-4, decay=0.0005, momentum=0.9)
         #optimizer = RMSprop(lr=1e-4, rho=0.9, epsilon=1e-08, decay=0.0)
 
-        self.model.compile(loss=[self.custom_loss_ttrack, self.custom_loss_dtrack], loss_weights=[1.5, 1.0], optimizer=optimizer)
+        self.model.compile(loss=[self.custom_loss_ttrack, self.custom_loss_dtrack], loss_weights=[0.7, 0.3], optimizer=optimizer)
         self.model.fit_generator(
                     generator        = train_batch,
                     steps_per_epoch  = len(train_batch),
@@ -270,12 +283,14 @@ class MultiObjDetTracker:
                     verbose          = 1,
                     validation_data  = valid_batch,
                     validation_steps = len(valid_batch),
-                    callbacks        = [early_stop, checkpoint, tensorboard],
-                    max_queue_size   = 3)
+                    callbacks        = [early_stop, checkpoint, tensorboard, reduce_lr],
+                    max_queue_size   = 3,
+                    initial_epoch    = self.INITIAL_EPOCH)
 
 
-    def load_weights(self, weight_path):
-        self.model.load_weights(weight_path)
+    def load_weights(self):
+        self.model.load_weights(self.SAVED_MODEL_PATH)
+        self.INITIAL_EPOCH = int(self.SAVED_MODEL_PATH.split('-')[2])
 
     def predict(self, input_paths, output_paths):
         assert len(input_paths)==self.SEQUENCE_LENGTH
